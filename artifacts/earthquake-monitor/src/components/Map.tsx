@@ -1,18 +1,11 @@
 import React from 'react';
-import { MapContainer, TileLayer, GeoJSON, Marker, useMap } from 'react-leaflet';
+import { MapContainer, GeoJSON, Marker, ZoomControl } from 'react-leaflet';
 import L from 'leaflet';
-import { EarthquakeHistoryItem, getScaleText } from '../lib/utils-earthquake';
+import { EarthquakeHistoryItem, getIntensityColor, getScaleText } from '../lib/utils-earthquake';
 import { useEffect, useState } from 'react';
 
 type Props = {
   currentQuake: EarthquakeHistoryItem | null;
-};
-
-// Map color constants
-const COLORS = {
-  10: '#4682B4', 20: '#2E8B57', 30: '#DAA520', 40: '#E67E22',
-  45: '#C0392B', 50: '#922B21', 55: '#8E44AD', 60: '#76448A', 70: '#512E5F',
-  default: '#15151b'
 };
 
 export const EarthquakeMap = ({ currentQuake }: Props) => {
@@ -32,13 +25,13 @@ export const EarthquakeMap = ({ currentQuake }: Props) => {
   }
 
   const getStyle = (feature: any) => {
-    let color = COLORS.default;
+    let color = '#15151b';
     if (currentQuake) {
       for (const pref in prefScales) {
         const prefName = pref.replace(/県|府|都/, '');
         if (JSON.stringify(feature.properties).includes(prefName)) {
           const scale = prefScales[pref];
-          color = (COLORS as any)[scale] || color;
+          color = getIntensityColor(scale);
         }
       }
     }
@@ -72,9 +65,10 @@ export const EarthquakeMap = ({ currentQuake }: Props) => {
       zoom={5.5} 
       zoomControl={false} 
       attributionControl={false}
+      minZoom={4}
       style={{ width: '100vw', height: '100vh', position: 'absolute', top: 0, left: 0, zIndex: 1 }}
     >
-      {/* <TileLayer url="https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png" /> */}
+      <ZoomControl position="bottomright" />
       
       {geoData && (
         <GeoJSON 

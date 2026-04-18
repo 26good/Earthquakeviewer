@@ -9,14 +9,18 @@ import { initAudioContext } from './lib/audio';
 import { useEarthquakes } from './hooks/use-earthquakes';
 import { useEEW } from './hooks/use-eew';
 import { EarthquakeMap } from './components/Map';
-import { getScaleText, getMagColor, getDepthColor } from './lib/utils-earthquake';
+import { getScaleText, getMagColor, getDepthColor, getIntensityColor } from './lib/utils-earthquake';
 
 const queryClient = new QueryClient();
 
 const APP_VERSION = "Ver 1.2.1";
 
 function Home() {
-  const [isSoundEnabled, setIsSoundEnabled] = useState(false);
+  const [isSoundEnabled, setIsSoundEnabled] = useState(true);
+  
+  useEffect(() => {
+    initAudioContext();
+  }, []);
   
   const handleSoundToggle = () => {
     if (!isSoundEnabled) {
@@ -32,6 +36,17 @@ function Home() {
   const isEEWMode = !!eew;
   
   const isWarning = eew?.Title?.includes('警報');
+  const currentMagnitude = isEEWMode
+    ? parseFloat(eew.Magunitude || eew.Magnitude || "0")
+    : selectedQuake?.earthquake.hypocenter.magnitude || 0;
+  const currentDepth = isEEWMode
+    ? parseInt(eew.Depth || "0")
+    : selectedQuake?.earthquake.hypocenter.depth || 0;
+  const currentIntensityColor = getIntensityColor(
+    isEEWMode ? eew.MaxInt : selectedQuake?.earthquake.maxScale
+  );
+  const currentMagColor = getMagColor(currentMagnitude);
+  const currentDepthColor = getDepthColor(currentDepth);
 
   return (
     <div className="relative w-full h-screen bg-black overflow-hidden font-sans text-white dark">
@@ -48,9 +63,8 @@ function Home() {
         {isSoundEnabled ? '🔊 Sound ON' : '🔇 Sound OFF'}
       </button>
 
-      <div className="absolute top-5 left-5 w-[350px] h-[calc(100vh-40px)] z-50 flex flex-col gap-4 pointer-events-none">
+      <div className="ui-layer absolute top-5 left-5 w-[350px] h-[calc(100vh-40px)] z-50 flex flex-col gap-4 pointer-events-none">
         
-        {/* Detail Panel */}
         {displayData && (
           <div className={`rounded-xl overflow-hidden shadow-2xl flex-shrink-0 border border-white/10 transition-colors duration-300 pointer-events-auto
             ${isEEWMode ? (isWarning ? 'bg-[#d33c30]/10' : 'bg-[#d37e30]/10') : 'bg-[#202434]'}`}
@@ -83,10 +97,8 @@ function Home() {
                 </div>
               </div>
 
-              <div className={`flex items-center justify-between p-3 rounded-lg mb-4
-                ${isEEWMode 
-                  ? (isWarning ? 'bg-[#d33c30]' : 'bg-[#d37e30]') 
-                  : 'bg-[#4b89a8]'}`}
+              <div className="flex items-center justify-between p-3 rounded-lg mb-4 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.16)] transition-colors duration-300"
+                style={{ backgroundColor: currentIntensityColor }}
               >
                 <div className="text-lg font-black leading-tight">
                   {isEEWMode && <div className="text-sm">推定</div>}
@@ -100,13 +112,13 @@ function Home() {
               <div className="flex justify-between items-center mb-2 font-bold text-base">
                 <div>マグニチュード</div>
                 <div className="flex items-center gap-2">
-                  <div className="text-3xl font-sans font-normal">
+                  <div className="text-3xl font-sans font-normal transition-colors duration-300" style={{ color: currentMagColor }}>
                     {isEEWMode 
                       ? parseFloat(eew.Magunitude || eew.Magnitude || "0").toFixed(1) 
                       : (selectedQuake && selectedQuake.earthquake.hypocenter.magnitude !== -1.0 ? selectedQuake.earthquake.hypocenter.magnitude.toFixed(1) : "不明")}
                   </div>
                   <div className="w-2.5 h-[26px] rounded-sm transition-colors duration-300" 
-                    style={{ backgroundColor: getMagColor(isEEWMode ? parseFloat(eew.Magunitude || "0") : (selectedQuake?.earthquake.hypocenter.magnitude || 0)) }}>
+                    style={{ backgroundColor: currentMagColor, boxShadow: `0 0 12px ${currentMagColor}` }}>
                   </div>
                 </div>
               </div>
@@ -114,14 +126,14 @@ function Home() {
               <div className="flex justify-between items-center mb-2 font-bold text-base">
                 <div>深さ</div>
                 <div className="flex items-center gap-2">
-                  <div className="text-3xl font-sans font-normal flex items-baseline">
+                  <div className="text-3xl font-sans font-normal flex items-baseline transition-colors duration-300" style={{ color: currentDepthColor }}>
                     {isEEWMode 
                       ? parseInt(eew.Depth || "0") 
                       : (selectedQuake?.earthquake.hypocenter.depth === 0 ? "ごく浅い" : selectedQuake?.earthquake.hypocenter.depth || "--")}
                     <span className="text-sm ml-1">{isEEWMode || (selectedQuake && selectedQuake.earthquake.hypocenter.depth !== 0) ? "km" : ""}</span>
                   </div>
                   <div className="w-2.5 h-[26px] rounded-sm transition-colors duration-300" 
-                    style={{ backgroundColor: getDepthColor(isEEWMode ? parseInt(eew.Depth || "0") : (selectedQuake?.earthquake.hypocenter.depth || 0)) }}>
+                    style={{ backgroundColor: currentDepthColor, boxShadow: `0 0 12px ${currentDepthColor}` }}>
                   </div>
                 </div>
               </div>
@@ -139,7 +151,6 @@ function Home() {
           </div>
         )}
 
-        {/* History Panel */}
         <div className="glass-panel flex-grow flex flex-col overflow-hidden min-h-0 p-3 rounded-xl pointer-events-auto">
           <div className="flex justify-between items-center mb-3">
             <h2 className="text-sm m-0 text-[#a0a0a8]">地震履歴</h2>
@@ -173,7 +184,7 @@ function Home() {
 
       </div>
 
-      <div className="absolute bottom-5 right-5 z-50 bg-[#141419]/85 backdrop-blur-md px-4 py-2 rounded-full text-xs text-[#a0a0a8] transition-colors duration-300">
+      <div className="status-bar absolute bottom-5 right-5 z-50 bg-[#141419]/85 backdrop-blur-md px-4 py-2 rounded-full text-xs text-[#a0a0a8] transition-colors duration-300">
         {status} | {APP_VERSION}
       </div>
 

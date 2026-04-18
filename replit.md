@@ -6,6 +6,8 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 
 The main user-facing app is a Japanese earthquake monitoring dashboard at the root preview path. It displays a full-screen Japan map, recent earthquake history from P2PQuake, prefecture intensity coloring, epicenter markers, sound alerts, and EEW WebSocket status.
 
+Recent UI preferences: maximum intensity panels should use the same color scale as seismic intensity; magnitude colors progress blue, green, yellow, orange, red, purple as values increase; depth colors progress red, yellow, green, blue as depth increases; sound should show ON by default; the app should support phone and iPad-sized screens and display map zoom controls.
+
 ## Stack
 
 - **Monorepo tool**: pnpm workspaces

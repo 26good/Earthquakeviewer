@@ -42,16 +42,52 @@ export const getScaleText = (scale: number) => {
   return map[scale] || '?';
 };
 
+export const getIntensityColor = (scale: number | string | undefined) => {
+  if (typeof scale === 'string') {
+    const normalized = scale.replace('弱', '-').replace('強', '+');
+    const map: Record<string, string> = {
+      '1': '#4682B4',
+      '2': '#2E8B57',
+      '3': '#DAA520',
+      '4': '#E67E22',
+      '5-': '#C0392B',
+      '5+': '#922B21',
+      '6-': '#8E44AD',
+      '6+': '#76448A',
+      '7': '#512E5F',
+    };
+    return map[normalized] || '#4b89a8';
+  }
+
+  const map: Record<number, string> = {
+    10: '#4682B4',
+    20: '#2E8B57',
+    30: '#DAA520',
+    40: '#E67E22',
+    45: '#C0392B',
+    50: '#922B21',
+    55: '#8E44AD',
+    60: '#76448A',
+    70: '#512E5F',
+  };
+  return scale ? map[scale] || '#4b89a8' : '#4b89a8';
+};
+
 export const getMagColor = (mag: number) => {
-  if (mag >= 6.0) return '#e54d42'; 
-  if (mag >= 4.0) return '#f39c12'; 
-  return '#559dd6'; 
+  if (!Number.isFinite(mag) || mag <= 0) return '#a0a0a8';
+  if (mag < 2.0) return '#3b82f6';
+  if (mag < 4.0) return '#22c55e';
+  if (mag < 5.0) return '#facc15';
+  if (mag < 6.0) return '#f97316';
+  if (mag < 7.0) return '#ef4444';
+  return '#8b5cf6';
 };
 
 export const getDepthColor = (depth: number | string) => {
-  if (depth === "ごく浅い" || depth === 0) return '#e54d42'; 
-  if (typeof depth !== 'number') return '#a0a0a8'; 
-  if (depth <= 30) return '#e54d42'; 
-  if (depth <= 100) return '#f39c12'; 
-  return '#559dd6'; 
+  if (depth === "ごく浅い" || depth === 0) return '#ef4444';
+  if (typeof depth !== 'number' || !Number.isFinite(depth)) return '#a0a0a8';
+  if (depth <= 30) return '#ef4444';
+  if (depth <= 80) return '#facc15';
+  if (depth <= 150) return '#22c55e';
+  return '#3b82f6';
 };

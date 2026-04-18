@@ -165,3 +165,92 @@
   bottom: 60px;
   right: 10px;
 }
+
+.leaflet-control-zoom {
+  border: 1px solid rgba(255,255,255,0.18) !important;
+  border-radius: 12px !important;
+  overflow: hidden;
+  background: rgba(20, 20, 25, 0.86) !important;
+  backdrop-filter: blur(16px);
+}
+
+.leaflet-control-zoom a {
+  width: 36px !important;
+  height: 36px !important;
+  line-height: 34px !important;
+  color: #fff !important;
+  background: rgba(20, 20, 25, 0.86) !important;
+  border-color: rgba(255,255,255,0.12) !important;
+}
+
+.leaflet-control-zoom a:hover {
+  background: rgba(76, 208, 167, 0.18) !important;
+}
+
+@media (max-width: 900px) {
+  .ui-layer {
+    top: 12px !important;
+    left: 12px !important;
+    width: min(360px, calc(100vw - 24px)) !important;
+    height: calc(100dvh - 92px) !important;
+    gap: 10px !important;
+  }
+
+  #sound-toggle {
+    top: 12px !important;
+    right: 12px !important;
+    padding: 6px 12px !important;
+    font-size: 12px !important;
+  }
+
+  .status-bar {
+    left: 12px !important;
+    right: 12px !important;
+    bottom: 12px !important;
+    text-align: center;
+    border-radius: 14px !important;
+  }
+
+  .leaflet-bottom.leaflet-right {
+    bottom: 58px !important;
+    right: 12px !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .ui-layer {
+    top: auto !important;
+    bottom: 56px !important;
+    left: 8px !important;
+    right: 8px !important;
+    width: auto !important;
+    height: min(58dvh, 500px) !important;
+    gap: 8px !important;
+  }
+
+  .ui-layer > div:first-child {
+    max-height: 280px;
+  }
+
+  .ui-layer .text-2xl {
+    font-size: 1.1rem !important;
+  }
+
+  .ui-layer .text-5xl {
+    font-size: 2.5rem !important;
+  }
+
+  .ui-layer .text-3xl {
+    font-size: 1.55rem !important;
+  }
+
+  #sound-toggle {
+    top: 10px !important;
+    right: 10px !important;
+  }
+
+  .leaflet-bottom.leaflet-right {
+    bottom: calc(58dvh + 64px) !important;
+    right: 10px !important;
+  }
+}
