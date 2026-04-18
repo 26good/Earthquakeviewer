@@ -1,0 +1,167 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@plugin "@tailwindcss/typography";
+@import "leaflet/dist/leaflet.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+  --color-card-border: hsl(var(--card-border));
+
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+  --color-popover-border: hsl(var(--popover-border));
+
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+  
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+
+  --font-sans: 'Inter', 'Noto Sans JP', sans-serif;
+  --font-mono: 'DotGothic16', monospace;
+}
+
+:root {
+  --background: 240 100% 1%; /* #000002 */
+  --foreground: 0 0% 100%;
+  --border: 240 5% 26%;
+  --input: 240 5% 26%;
+  --ring: 240 5% 26%;
+
+  --card: 226 24% 16%; /* #202434 */
+  --card-foreground: 0 0% 100%;
+  --card-border: 240 5% 26%;
+
+  --popover: 226 24% 16%;
+  --popover-foreground: 0 0% 100%;
+  --popover-border: 240 5% 26%;
+
+  --primary: 156 59% 51%; /* #4cd0a7 */
+  --primary-foreground: 0 0% 100%;
+
+  --muted: 240 4% 16%;
+  --muted-foreground: 240 5% 65%; /* #a0a0a8 */
+
+  --accent: 240 4% 16%;
+  --accent-foreground: 0 0% 100%;
+
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 0 0% 100%;
+
+  --radius: 12px;
+}
+
+.dark {
+  --background: 240 100% 1%;
+  --foreground: 0 0% 100%;
+  --border: 240 5% 26%;
+  --input: 240 5% 26%;
+  --ring: 240 5% 26%;
+
+  --card: 226 24% 16%;
+  --card-foreground: 0 0% 100%;
+  --card-border: 240 5% 26%;
+
+  --popover: 226 24% 16%;
+  --popover-foreground: 0 0% 100%;
+  --popover-border: 240 5% 26%;
+
+  --primary: 156 59% 51%;
+  --primary-foreground: 0 0% 100%;
+
+  --muted: 240 4% 16%;
+  --muted-foreground: 240 5% 65%;
+
+  --accent: 240 4% 16%;
+  --accent-foreground: 0 0% 100%;
+
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 0 0% 100%;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply font-sans antialiased bg-background text-foreground overflow-hidden;
+  }
+}
+
+/* Custom Utilities for Earthquake Monitor */
+.glass-panel {
+  background: rgba(20, 20, 25, 0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+}
+
+.eew-warning-header {
+  background: repeating-linear-gradient(-45deg, #220000, #220000 10px, #440000 10px, #440000 20px);
+}
+.eew-forecast-header {
+  background: repeating-linear-gradient(-45deg, #332200, #332200 10px, #553300 10px, #553300 20px);
+}
+
+.intensity-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  font-family: 'DotGothic16', monospace;
+  font-size: 18px;
+  font-weight: bold;
+  color: white;
+  border: 2px solid rgba(255, 255, 255, 0.8);
+  box-shadow: 0 0 10px rgba(0,0,0,0.6);
+  text-shadow: 1px 1px 0 #000;
+}
+
+.epicenter-mark {
+  font-size: 36px;
+  font-weight: 900;
+  color: #ff3333;
+  line-height: 1;
+  text-align: center;
+  text-shadow: 0 0 4px #fff, 0 0 8px #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.scale-10 { background: #4682B4; }
+.scale-20 { background: #2E8B57; }
+.scale-30 { background: #DAA520; }
+.scale-40 { background: #E67E22; }
+.scale-45 { background: #C0392B; }
+.scale-50 { background: #922B21; }
+.scale-55 { background: #8E44AD; }
+.scale-60 { background: #76448A; }
+.scale-70 { background: #512E5F; }
+
+/* Map overrides */
+.leaflet-container {
+  background-color: #050508 !important;
+}
+.leaflet-bottom.leaflet-right {
+  bottom: 60px;
+  right: 10px;
+}
