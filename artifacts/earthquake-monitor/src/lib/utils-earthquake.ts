@@ -31,6 +31,10 @@ export type EEWData = {
   MaxInt: string;
   Magunitude?: string;
   Magnitude?: string;
+  Latitude?: string | number;
+  Longitude?: string | number;
+  latitude?: string | number;
+  longitude?: string | number;
   Depth: string;
   Serial: string;
 };

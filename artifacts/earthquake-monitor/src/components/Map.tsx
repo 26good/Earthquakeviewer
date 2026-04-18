@@ -1,11 +1,12 @@
 import React from 'react';
 import { Circle, GeoJSON, MapContainer, Marker, useMap, ZoomControl } from 'react-leaflet';
 import L from 'leaflet';
-import { EarthquakeHistoryItem, getIntensityColor, getScaleText } from '../lib/utils-earthquake';
+import { EEWData, EarthquakeHistoryItem, getIntensityColor, getScaleText } from '../lib/utils-earthquake';
 import { useEffect, useState } from 'react';
 
 type Props = {
   currentQuake: EarthquakeHistoryItem | null;
+  eew: EEWData | null;
 };
 
 const P_WAVE_SPEED_KM_PER_SEC = 6.0;
@@ -13,12 +14,18 @@ const S_WAVE_SPEED_KM_PER_SEC = 3.5;
 const MAX_WAVE_RADIUS_KM = 2500;
 
 const getWaveRadiusKm = (quakeTime: string, depth: number, speed: number, now: number) => {
-  const originTime = new Date(quakeTime).getTime();
+  const originTime = new Date(quakeTime.replace(/-/g, '/')).getTime();
   if (!Number.isFinite(originTime)) return 0;
   const elapsedSeconds = Math.max(0, (now - originTime) / 1000);
   const travelDistance = elapsedSeconds * speed;
   const surfaceDistance = Math.sqrt(Math.max(0, travelDistance ** 2 - Math.max(0, depth) ** 2));
   return Math.min(surfaceDistance, MAX_WAVE_RADIUS_KM);
+};
+
+const parseCoordinate = (value: string | number | undefined) => {
+  if (value === undefined || value === null) return 0;
+  const coordinate = typeof value === 'number' ? value : parseFloat(value);
+  return Number.isFinite(coordinate) ? coordinate : 0;
 };
 
 const AutoZoomToEpicenter = ({ quake }: { quake: EarthquakeHistoryItem | null }) => {
@@ -36,7 +43,7 @@ const AutoZoomToEpicenter = ({ quake }: { quake: EarthquakeHistoryItem | null })
   return null;
 };
 
-export const EarthquakeMap = ({ currentQuake }: Props) => {
+export const EarthquakeMap = ({ currentQuake, eew }: Props) => {
   const [geoData, setGeoData] = useState<any>(null);
   const [now, setNow] = useState(Date.now());
 
@@ -117,11 +124,26 @@ export const EarthquakeMap = ({ currentQuake }: Props) => {
         }
       : null;
 
-  const pWaveRadius = epicenter
-    ? getWaveRadiusKm(epicenter.time, epicenter.depth, P_WAVE_SPEED_KM_PER_SEC, now) * 1000
+  const eewEpicenter =
+    eew && !eew.isCancel
+      ? {
+          lat: parseCoordinate(eew.Latitude ?? eew.latitude),
+          lng: parseCoordinate(eew.Longitude ?? eew.longitude),
+          depth: parseInt(eew.Depth || '0', 10) || 0,
+          time: eew.OriginTime,
+        }
+      : null;
+
+  const waveEpicenter =
+    eewEpicenter && eewEpicenter.lat > 0 && eewEpicenter.lng > 0
+      ? eewEpicenter
+      : null;
+
+  const pWaveRadius = waveEpicenter
+    ? getWaveRadiusKm(waveEpicenter.time, waveEpicenter.depth, P_WAVE_SPEED_KM_PER_SEC, now) * 1000
     : 0;
-  const sWaveRadius = epicenter
-    ? getWaveRadiusKm(epicenter.time, epicenter.depth, S_WAVE_SPEED_KM_PER_SEC, now) * 1000
+  const sWaveRadius = waveEpicenter
+    ? getWaveRadiusKm(waveEpicenter.time, waveEpicenter.depth, S_WAVE_SPEED_KM_PER_SEC, now) * 1000
     : 0;
 
   return (
@@ -144,9 +166,9 @@ export const EarthquakeMap = ({ currentQuake }: Props) => {
         />
       )}
 
-      {epicenter && pWaveRadius > 0 && (
+      {waveEpicenter && pWaveRadius > 0 && (
         <Circle
-          center={[epicenter.lat, epicenter.lng]}
+          center={[waveEpicenter.lat, waveEpicenter.lng]}
           radius={pWaveRadius}
           pathOptions={{
             color: '#4cc9f0',
@@ -160,9 +182,9 @@ export const EarthquakeMap = ({ currentQuake }: Props) => {
         />
       )}
 
-      {epicenter && sWaveRadius > 0 && (
+      {waveEpicenter && sWaveRadius > 0 && (
         <Circle
-          center={[epicenter.lat, epicenter.lng]}
+          center={[waveEpicenter.lat, waveEpicenter.lng]}
           radius={sWaveRadius}
           pathOptions={{
             color: '#f97316',
@@ -175,17 +197,17 @@ export const EarthquakeMap = ({ currentQuake }: Props) => {
         />
       )}
 
-      {epicenter && (
+      {waveEpicenter && (
         <Marker
-          position={[epicenter.lat, epicenter.lng]}
+          position={[waveEpicenter.lat, waveEpicenter.lng]}
           icon={sWaveIcon}
           interactive={false}
         />
       )}
 
-      {epicenter && (
+      {waveEpicenter && (
         <Marker
-          position={[epicenter.lat, epicenter.lng]}
+          position={[waveEpicenter.lat, waveEpicenter.lng]}
           icon={pWaveIcon}
           interactive={false}
         />
