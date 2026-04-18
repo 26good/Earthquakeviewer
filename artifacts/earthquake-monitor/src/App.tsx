@@ -63,6 +63,18 @@ function Home() {
         {isSoundEnabled ? '🔊 Sound ON' : '🔇 Sound OFF'}
       </button>
 
+      <div className="wave-legend absolute top-20 right-5 z-50 rounded-2xl border border-white/10 bg-[#141419]/85 px-4 py-3 text-xs text-white/80 backdrop-blur-md shadow-2xl">
+        <div className="mb-2 font-bold text-white">P波・S波 推定到達範囲</div>
+        <div className="flex items-center gap-2">
+          <span className="h-2 w-8 rounded-full border border-[#4cc9f0]"></span>
+          <span>P波</span>
+        </div>
+        <div className="mt-1 flex items-center gap-2">
+          <span className="h-2 w-8 rounded-full bg-[#f97316]/50 ring-1 ring-[#f97316]"></span>
+          <span>S波</span>
+        </div>
+      </div>
+
       <div className="ui-layer absolute top-5 left-5 w-[350px] h-[calc(100vh-40px)] z-50 flex flex-col gap-4 pointer-events-none">
         
         {displayData && (
