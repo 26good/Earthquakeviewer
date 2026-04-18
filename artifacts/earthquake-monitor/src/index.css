@@ -157,6 +157,24 @@
 .scale-60 { background: #76448A; }
 .scale-70 { background: #512E5F; }
 
+.history-list {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.22) transparent;
+}
+
+.history-list::-webkit-scrollbar {
+  width: 4px;
+}
+
+.history-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.history-list::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.22);
+  border-radius: 999px;
+}
+
 /* Map overrides */
 .leaflet-container {
   background-color: #050508 !important;

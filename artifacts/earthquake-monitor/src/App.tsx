@@ -156,7 +156,7 @@ function Home() {
             <h2 className="text-sm m-0 text-[#a0a0a8]">地震履歴</h2>
             <span className="text-xs text-[#4cd0a7] font-mono">{lastUpdate}</span>
           </div>
-          <div className="overflow-y-auto flex-grow flex flex-col gap-2 pr-1 custom-scrollbar">
+          <div className="history-list overflow-y-auto flex-grow flex flex-col gap-2 p-px custom-scrollbar">
             {history.map(eq => {
               const scale = eq.earthquake.maxScale;
               const timeStr = eq.earthquake.time.substring(5, 16).replace('-', '/');
