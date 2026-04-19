@@ -182,7 +182,7 @@ function Home() {
         <div className="glass-panel flex-grow flex flex-col overflow-hidden min-h-0 p-3 rounded-xl pointer-events-auto">
           <div className="flex justify-between items-center mb-3">
             <h2 className="text-sm m-0 text-[#a0a0a8]">地震履歴</h2>
-            <span className="text-sm text-[#4cd0a7]">最終更新：{lastUpdate}</span>
+            <span className="text-sm text-white">最終更新：{lastUpdate}</span>
           </div>
           <div className="history-list overflow-y-auto flex-grow flex flex-col gap-2 p-px custom-scrollbar">
             {history.map(eq => {
@@ -213,12 +213,12 @@ function Home() {
       </div>
 
       <div className="current-time-panel absolute top-5 left-[390px] z-50 rounded-xl border border-white/10 bg-[#141419]/85 px-4 py-3 text-white backdrop-blur-md shadow-2xl">
-        <div className="text-[0.65rem] font-bold tracking-[0.18em] text-[#a0a0a8]">現在時刻</div>
-        <div className="font-mono text-2xl font-black leading-tight text-[#4cd0a7]">{currentTime}</div>
+        <div className="text-sm font-bold text-white">現在時刻</div>
+        <div className="text-sm text-white">{currentTime}</div>
       </div>
 
       <div className="status-bar absolute bottom-5 right-5 z-50 bg-[#141419]/85 backdrop-blur-md px-4 py-2 rounded-full text-xs text-[#a0a0a8] transition-colors duration-300">
-        {status} | Ver 1.2.3
+        {status} | Ver 1.2.4
       </div>
 
     </div>
