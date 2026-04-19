@@ -6,6 +6,7 @@ export const useEarthquakes = (isSoundEnabled: boolean) => {
   const [history, setHistory] = useState<EarthquakeHistoryItem[]>([]);
   const [selectedQuake, setSelectedQuake] = useState<EarthquakeHistoryItem | null>(null);
   const [lastUpdate, setLastUpdate] = useState<string>('--:--:--');
+  const [version, setVersion] = useState<number>(1);
   const lastQuakeIdRef = useRef<string | null>(null);
 
   const fetchHistory = async () => {
@@ -38,6 +39,7 @@ export const useEarthquakes = (isSoundEnabled: boolean) => {
         
         lastQuakeIdRef.current = newQuakeId;
         setHistory(validQuakes.slice(0, 10));
+        setVersion(prev => prev + 1);
       }
       
       setLastUpdate(new Date().toLocaleTimeString('ja-JP', { hour12: false }));
@@ -52,5 +54,5 @@ export const useEarthquakes = (isSoundEnabled: boolean) => {
     return () => clearInterval(interval);
   }, [isSoundEnabled]);
 
-  return { history, selectedQuake, setSelectedQuake, lastUpdate };
+  return { history, selectedQuake, setSelectedQuake, lastUpdate, version };
 };

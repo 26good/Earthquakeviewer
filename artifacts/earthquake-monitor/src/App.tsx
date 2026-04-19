@@ -13,8 +13,6 @@ import { getScaleText, getMagColor, getDepthColor, getIntensityColor } from './l
 
 const queryClient = new QueryClient();
 
-const APP_VERSION = "Ver 1.2.1";
-
 function Home() {
   const [isSoundEnabled, setIsSoundEnabled] = useState(true);
   
@@ -29,7 +27,7 @@ function Home() {
     setIsSoundEnabled(!isSoundEnabled);
   };
 
-  const { history, selectedQuake, setSelectedQuake, lastUpdate } = useEarthquakes(isSoundEnabled);
+  const { history, selectedQuake, setSelectedQuake, lastUpdate, version } = useEarthquakes(isSoundEnabled);
   const { eew, status } = useEEW(isSoundEnabled);
 
   const displayData = eew || selectedQuake;
@@ -199,7 +197,7 @@ function Home() {
       </div>
 
       <div className="status-bar absolute bottom-5 right-5 z-50 bg-[#141419]/85 backdrop-blur-md px-4 py-2 rounded-full text-xs text-[#a0a0a8] transition-colors duration-300">
-        {status} | {APP_VERSION}
+        {status} | Ver {version}
       </div>
 
     </div>
