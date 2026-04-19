@@ -9,6 +9,8 @@ export const useEEW = (isSoundEnabled: boolean) => {
   useEffect(() => {
     let ws: WebSocket;
     let reconnectTimer: NodeJS.Timeout;
+    let keepAliveTimer: NodeJS.Timeout;
+    let fallbackTimer: NodeJS.Timeout;
 
     const connect = () => {
       ws = new WebSocket('wss://ws-api.wolfx.jp/jma_eew');
@@ -28,7 +30,8 @@ export const useEEW = (isSoundEnabled: boolean) => {
             setEEW(data);
             
             // Clear EEW after 3 minutes if no new updates
-            setTimeout(() => setEEW(null), 180000);
+            clearTimeout(fallbackTimer);
+            fallbackTimer = setTimeout(() => setEEW(null), 180000);
           }
         } catch (e) {
           console.error('EEW Parse Error:', e);
@@ -39,12 +42,20 @@ export const useEEW = (isSoundEnabled: boolean) => {
         setStatus('Connection Lost. Reconnecting...');
         reconnectTimer = setTimeout(connect, 5000);
       };
+
+      keepAliveTimer = setInterval(() => {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send('ping');
+        }
+      }, 30000);
     };
 
     connect();
 
     return () => {
       clearTimeout(reconnectTimer);
+      clearTimeout(fallbackTimer);
+      clearInterval(keepAliveTimer);
       if (ws) ws.close();
     };
   }, [isSoundEnabled]);

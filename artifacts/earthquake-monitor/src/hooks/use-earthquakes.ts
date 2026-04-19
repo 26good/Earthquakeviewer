@@ -48,7 +48,7 @@ export const useEarthquakes = (isSoundEnabled: boolean) => {
 
   useEffect(() => {
     fetchHistory();
-    const interval = setInterval(fetchHistory, 60000);
+    const interval = setInterval(fetchHistory, 3000);
     return () => clearInterval(interval);
   }, [isSoundEnabled]);
 
