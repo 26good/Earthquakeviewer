@@ -27,7 +27,7 @@ function Home() {
     setIsSoundEnabled(!isSoundEnabled);
   };
 
-  const { history, selectedQuake, setSelectedQuake, lastUpdate, version } = useEarthquakes(isSoundEnabled);
+  const { history, selectedQuake, setSelectedQuake, lastUpdate } = useEarthquakes(isSoundEnabled);
   const { eew, status } = useEEW(isSoundEnabled);
 
   const displayData = eew || selectedQuake;
@@ -166,7 +166,7 @@ function Home() {
         <div className="glass-panel flex-grow flex flex-col overflow-hidden min-h-0 p-3 rounded-xl pointer-events-auto">
           <div className="flex justify-between items-center mb-3">
             <h2 className="text-sm m-0 text-[#a0a0a8]">地震履歴</h2>
-            <span className="text-xs text-[#4cd0a7] font-mono">{lastUpdate}</span>
+            <span className="text-sm text-[#4cd0a7]">最終更新：{lastUpdate}</span>
           </div>
           <div className="history-list overflow-y-auto flex-grow flex flex-col gap-2 p-px custom-scrollbar">
             {history.map(eq => {
@@ -197,7 +197,7 @@ function Home() {
       </div>
 
       <div className="status-bar absolute bottom-5 right-5 z-50 bg-[#141419]/85 backdrop-blur-md px-4 py-2 rounded-full text-xs text-[#a0a0a8] transition-colors duration-300">
-        {status} | Ver {version}
+        {status} | Ver 1.2.2
       </div>
 
     </div>
