@@ -2,6 +2,14 @@ import { useState, useEffect, useRef } from 'react';
 import { EarthquakeHistoryItem } from '../lib/utils-earthquake';
 import { playSound } from '../lib/audio';
 
+const formatLastUpdateTime = () =>
+  new Date().toLocaleTimeString('ja-JP', {
+    hour12: false,
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  });
+
 export const useEarthquakes = (isSoundEnabled: boolean) => {
   const [history, setHistory] = useState<EarthquakeHistoryItem[]>([]);
   const [selectedQuake, setSelectedQuake] = useState<EarthquakeHistoryItem | null>(null);
@@ -40,7 +48,7 @@ export const useEarthquakes = (isSoundEnabled: boolean) => {
         setHistory(validQuakes.slice(0, 10));
       }
       
-      setLastUpdate(new Date().toLocaleTimeString('ja-JP', { hour12: false }));
+      setLastUpdate(formatLastUpdateTime());
     } catch (e) {
       console.error('Error fetching earthquake history:', e);
     }

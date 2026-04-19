@@ -46,6 +46,7 @@ const AutoZoomToEpicenter = ({ quake }: { quake: EarthquakeHistoryItem | null })
 export const EarthquakeMap = ({ currentQuake, eew }: Props) => {
   const [geoData, setGeoData] = useState<any>(null);
   const [now, setNow] = useState(Date.now());
+  const hasTsunamiInfo = !!currentQuake && currentQuake.earthquake.domesticTsunami !== 'None';
 
   useEffect(() => {
     fetch('https://raw.githubusercontent.com/dataofjapan/land/master/japan.geojson')
@@ -77,12 +78,21 @@ export const EarthquakeMap = ({ currentQuake, eew }: Props) => {
       }
     }
     return {
-      color: '#444',
-      weight: 1,
+      color: hasTsunamiInfo ? '#38bdf8' : '#444',
+      weight: hasTsunamiInfo ? 1.8 : 1,
       fillColor: color,
-      fillOpacity: 1
+      fillOpacity: 1,
+      opacity: hasTsunamiInfo ? 0.95 : 1
     };
   };
+
+  const getTsunamiCoastlineStyle = () => ({
+    color: '#22d3ee',
+    weight: 4,
+    opacity: 0.9,
+    fillOpacity: 0,
+    className: 'tsunami-coastline-highlight',
+  });
 
   const createIcon = (scale: number) => {
     return L.divIcon({
@@ -160,9 +170,18 @@ export const EarthquakeMap = ({ currentQuake, eew }: Props) => {
       
       {geoData && (
         <GeoJSON 
-          key={currentQuake?.id || 'default'} 
+          key={`${currentQuake?.id || 'default'}-${hasTsunamiInfo ? 'tsunami' : 'normal'}`} 
           data={geoData} 
           style={getStyle} 
+        />
+      )}
+
+      {geoData && hasTsunamiInfo && (
+        <GeoJSON
+          key={`${currentQuake?.id || 'default'}-coastline-alert`}
+          data={geoData}
+          style={getTsunamiCoastlineStyle}
+          interactive={false}
         />
       )}
 

@@ -13,11 +13,27 @@ import { getScaleText, getMagColor, getDepthColor, getIntensityColor } from './l
 
 const queryClient = new QueryClient();
 
+const formatClockTime = () =>
+  new Date().toLocaleTimeString('ja-JP', {
+    hour12: false,
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  });
+
 function Home() {
   const [isSoundEnabled, setIsSoundEnabled] = useState(true);
+  const [currentTime, setCurrentTime] = useState(formatClockTime);
   
   useEffect(() => {
     initAudioContext();
+  }, []);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentTime(formatClockTime());
+    }, 1000);
+    return () => clearInterval(interval);
   }, []);
   
   const handleSoundToggle = () => {
@@ -196,8 +212,13 @@ function Home() {
 
       </div>
 
+      <div className="current-time-panel absolute top-5 left-[390px] z-50 rounded-xl border border-white/10 bg-[#141419]/85 px-4 py-3 text-white backdrop-blur-md shadow-2xl">
+        <div className="text-[0.65rem] font-bold tracking-[0.18em] text-[#a0a0a8]">現在時刻</div>
+        <div className="font-mono text-2xl font-black leading-tight text-[#4cd0a7]">{currentTime}</div>
+      </div>
+
       <div className="status-bar absolute bottom-5 right-5 z-50 bg-[#141419]/85 backdrop-blur-md px-4 py-2 rounded-full text-xs text-[#a0a0a8] transition-colors duration-300">
-        {status} | Ver 1.2.2
+        {status} | Ver 1.2.3
       </div>
 
     </div>

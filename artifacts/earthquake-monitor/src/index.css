@@ -206,6 +206,20 @@
   border-radius: 999px;
 }
 
+.tsunami-coastline-highlight {
+  filter: drop-shadow(0 0 5px rgba(34, 211, 238, 0.95)) drop-shadow(0 0 14px rgba(34, 211, 238, 0.65));
+  animation: tsunami-coastline-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes tsunami-coastline-pulse {
+  0%, 100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
 /* Map overrides */
 .leaflet-container {
   background-color: #050508 !important;
@@ -257,6 +271,17 @@
     right: 12px !important;
     padding: 8px 10px !important;
     font-size: 11px !important;
+  }
+
+  .current-time-panel {
+    top: auto !important;
+    left: 12px !important;
+    bottom: 58px !important;
+    padding: 8px 12px !important;
+  }
+
+  .current-time-panel div:last-child {
+    font-size: 18px !important;
   }
 
   .status-bar {
