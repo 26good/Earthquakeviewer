@@ -21,6 +21,35 @@ export type EarthquakeHistoryItem = {
   }[];
 };
 
+export type TsunamiGrade = 'MajorWarning' | 'Warning' | 'Watch' | string;
+
+export type TsunamiArea = {
+  name: string;
+  grade: TsunamiGrade;
+  immediate: boolean;
+  firstHeight?: {
+    arrivalTime?: string;
+    condition?: string;
+  };
+  maxHeight?: {
+    description?: string;
+    value?: number;
+  };
+};
+
+export type TsunamiInfo = {
+  id: string;
+  code: number;
+  cancelled: boolean;
+  time: string;
+  issue?: {
+    source?: string;
+    time?: string;
+    type?: string;
+  };
+  areas: TsunamiArea[];
+};
+
 export type EEWData = {
   type: string;
   isCancel: boolean;
@@ -94,4 +123,18 @@ export const getDepthColor = (depth: number | string) => {
   if (depth <= 80) return '#facc15';
   if (depth <= 150) return '#22c55e';
   return '#3b82f6';
+};
+
+export const getTsunamiGradeLabel = (grade: TsunamiGrade) => {
+  if (grade === 'MajorWarning') return '大津波警報';
+  if (grade === 'Warning') return '津波警報';
+  if (grade === 'Watch') return '津波注意報';
+  return '津波情報';
+};
+
+export const getTsunamiGradeColor = (grade: TsunamiGrade) => {
+  if (grade === 'MajorWarning') return '#8b5cf6';
+  if (grade === 'Warning') return '#ef4444';
+  if (grade === 'Watch') return '#facc15';
+  return '#38bdf8';
 };

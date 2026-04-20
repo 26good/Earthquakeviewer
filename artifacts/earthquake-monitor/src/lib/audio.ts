@@ -58,5 +58,11 @@ export const playSound = {
   final: () => {
     playMasterTone(320, 300, 0.25, 0.25);
     playMasterTone(240, 220, 0.4, 0.25, 'sine', 0.2);
+  },
+  tsunamiDanger: () => {
+    playMasterTone(180, 70, 1.1, 1.0, 'sawtooth');
+    playMasterTone(720, 520, 0.45, 0.95, 'square', 0.02);
+    playMasterTone(180, 70, 1.1, 1.0, 'sawtooth', 0.7);
+    playMasterTone(720, 520, 0.45, 0.95, 'square', 0.72);
   }
 };

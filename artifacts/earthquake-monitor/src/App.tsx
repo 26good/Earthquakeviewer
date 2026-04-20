@@ -8,8 +8,9 @@ import NotFound from "@/pages/not-found";
 import { initAudioContext } from './lib/audio';
 import { useEarthquakes } from './hooks/use-earthquakes';
 import { useEEW } from './hooks/use-eew';
+import { useTsunami } from './hooks/use-tsunami';
 import { EarthquakeMap } from './components/Map';
-import { getScaleText, getMagColor, getDepthColor, getIntensityColor } from './lib/utils-earthquake';
+import { EarthquakeHistoryItem, TsunamiInfo, getScaleText, getMagColor, getDepthColor, getIntensityColor, getTsunamiGradeColor, getTsunamiGradeLabel } from './lib/utils-earthquake';
 
 const queryClient = new QueryClient();
 
@@ -21,12 +22,101 @@ const formatClockTime = () =>
     second: '2-digit',
   });
 
+const createTestScenario = (name: 'sanriku' | 'nankai' | 'chiba') => {
+  const now = new Date();
+  const arrivalSoon = new Date(now.getTime() + 15 * 60 * 1000).toLocaleString('ja-JP', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  }).replace(/\//g, '/');
+
+  const scenarios = {
+    sanriku: {
+      hypocenter: { name: '三陸沖', latitude: 39.8, longitude: 143.2, magnitude: 7.4, depth: 10 },
+      maxScale: 50,
+      tsunamiAreas: [
+        { name: '岩手県', grade: 'Warning', immediate: true, firstHeight: { condition: '津波到達中と推測' }, maxHeight: { description: '３ｍ', value: 3 } },
+        { name: '青森県太平洋沿岸', grade: 'Warning', immediate: false, firstHeight: { arrivalTime: arrivalSoon }, maxHeight: { description: '３ｍ', value: 3 } },
+        { name: '宮城県', grade: 'Watch', immediate: false, firstHeight: { arrivalTime: arrivalSoon }, maxHeight: { description: '１ｍ', value: 1 } },
+      ],
+    },
+    nankai: {
+      hypocenter: { name: '南海トラフ', latitude: 32.4, longitude: 136.8, magnitude: 8.0, depth: 20 },
+      maxScale: 60,
+      tsunamiAreas: [
+        { name: '高知県', grade: 'MajorWarning', immediate: false, firstHeight: { arrivalTime: arrivalSoon }, maxHeight: { description: '５ｍ', value: 5 } },
+        { name: '徳島県', grade: 'Warning', immediate: false, firstHeight: { arrivalTime: arrivalSoon }, maxHeight: { description: '３ｍ', value: 3 } },
+        { name: '宮崎県', grade: 'Watch', immediate: false, firstHeight: { arrivalTime: arrivalSoon }, maxHeight: { description: '１ｍ', value: 1 } },
+      ],
+    },
+    chiba: {
+      hypocenter: { name: '千葉県東方沖', latitude: 35.4, longitude: 141.2, magnitude: 6.8, depth: 30 },
+      maxScale: 45,
+      tsunamiAreas: [
+        { name: '千葉県九十九里・外房', grade: 'Watch', immediate: false, firstHeight: { arrivalTime: arrivalSoon }, maxHeight: { description: '１ｍ', value: 1 } },
+        { name: '茨城県', grade: 'Watch', immediate: false, firstHeight: { arrivalTime: arrivalSoon }, maxHeight: { description: '１ｍ', value: 1 } },
+      ],
+    },
+  } as const;
+
+  const scenario = scenarios[name];
+  const pointPrefs = scenario.tsunamiAreas.map(area => area.name.match(/[^\s、]+?[都道府県]/)?.[0] || '岩手県');
+  const quake: EarthquakeHistoryItem = {
+    id: `test-${name}`,
+    time: now.toISOString(),
+    earthquake: {
+      time: now.toLocaleString('ja-JP', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false,
+      }),
+      hypocenter: scenario.hypocenter,
+      maxScale: scenario.maxScale,
+      domesticTsunami: 'Warning',
+    },
+    points: pointPrefs.map((pref, index) => ({
+      pref,
+      addr: 'テスト観測点',
+      isArea: false,
+      scale: Math.max(30, scenario.maxScale - index * 10),
+    })),
+  };
+
+  const tsunami: TsunamiInfo = {
+    id: `test-tsunami-${name}`,
+    code: 552,
+    cancelled: false,
+    time: now.toLocaleString('ja-JP'),
+    issue: { source: 'テスト', time: now.toLocaleString('ja-JP'), type: 'Focus' },
+    areas: [...scenario.tsunamiAreas],
+  };
+
+  return { quake, tsunami };
+};
+
 function Home() {
   const [isSoundEnabled, setIsSoundEnabled] = useState(true);
   const [currentTime, setCurrentTime] = useState(formatClockTime);
+  const [isTestMode, setIsTestMode] = useState(false);
+  const [testScenario, setTestScenario] = useState(createTestScenario('sanriku'));
   
   useEffect(() => {
     initAudioContext();
+    const resumeAudio = () => initAudioContext();
+    window.addEventListener('pointerdown', resumeAudio);
+    window.addEventListener('keydown', resumeAudio);
+    return () => {
+      window.removeEventListener('pointerdown', resumeAudio);
+      window.removeEventListener('keydown', resumeAudio);
+    };
   }, []);
 
   useEffect(() => {
@@ -34,6 +124,16 @@ function Home() {
       setCurrentTime(formatClockTime());
     }, 1000);
     return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.shiftKey && event.key.toLowerCase() === 't') {
+        setIsTestMode(prev => !prev);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
   }, []);
   
   const handleSoundToggle = () => {
@@ -45,26 +145,36 @@ function Home() {
 
   const { history, selectedQuake, setSelectedQuake, lastUpdate } = useEarthquakes(isSoundEnabled);
   const { eew, status } = useEEW(isSoundEnabled);
+  const { tsunami, lastTsunamiUpdate } = useTsunami(isSoundEnabled);
 
-  const displayData = eew || selectedQuake;
+  const activeQuake = isTestMode ? testScenario.quake : selectedQuake;
+  const activeTsunami = isTestMode ? testScenario.tsunami : tsunami;
+  const displayData = eew || activeQuake;
   const isEEWMode = !!eew;
+  const tsunamiLevel = activeTsunami?.areas.some(area => area.grade === 'MajorWarning')
+    ? 'MajorWarning'
+    : activeTsunami?.areas.some(area => area.grade === 'Warning')
+      ? 'Warning'
+      : activeTsunami?.areas.some(area => area.grade === 'Watch')
+        ? 'Watch'
+        : null;
   
   const isWarning = eew?.Title?.includes('警報');
   const currentMagnitude = isEEWMode
     ? parseFloat(eew.Magunitude || eew.Magnitude || "0")
-    : selectedQuake?.earthquake.hypocenter.magnitude || 0;
+    : activeQuake?.earthquake.hypocenter.magnitude || 0;
   const currentDepth = isEEWMode
     ? parseInt(eew.Depth || "0")
-    : selectedQuake?.earthquake.hypocenter.depth || 0;
+    : activeQuake?.earthquake.hypocenter.depth || 0;
   const currentIntensityColor = getIntensityColor(
-    isEEWMode ? eew.MaxInt : selectedQuake?.earthquake.maxScale
+    isEEWMode ? eew.MaxInt : activeQuake?.earthquake.maxScale
   );
   const currentMagColor = getMagColor(currentMagnitude);
   const currentDepthColor = getDepthColor(currentDepth);
 
   return (
     <div className="relative w-full h-screen bg-black overflow-hidden font-sans text-white dark">
-      <EarthquakeMap currentQuake={selectedQuake} eew={eew} />
+      <EarthquakeMap currentQuake={activeQuake} eew={eew} tsunami={activeTsunami} />
 
       <button 
         id="sound-toggle" 
@@ -117,11 +227,11 @@ function Home() {
             <div className="p-4">
               <div className="mb-4 flex flex-col-reverse">
                 <div className="text-2xl font-black leading-tight">
-                  {isEEWMode ? eew.Hypocenter || "不明" : selectedQuake?.earthquake.hypocenter.name}
+                  {isEEWMode ? eew.Hypocenter || "不明" : activeQuake?.earthquake.hypocenter.name}
                   <span className="text-sm font-normal ml-2">{isEEWMode ? "で地震" : "で地震がありました"}</span>
                 </div>
                 <div className="text-sm text-gray-300 mt-1">
-                  {isEEWMode ? `${eew.OriginTime} 発生` : `${selectedQuake ? new Date(selectedQuake.earthquake.time).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '--/-- --:--'} ごろ`}
+                  {isEEWMode ? `${eew.OriginTime} 発生` : `${activeQuake ? new Date(activeQuake.earthquake.time.replace(/-/g, '/')).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '--/-- --:--'} ごろ`}
                 </div>
               </div>
 
@@ -133,7 +243,7 @@ function Home() {
                   最大震度
                 </div>
                 <div className="text-5xl font-sans font-black leading-none text-white">
-                  {isEEWMode ? (eew.MaxInt || "-") : (selectedQuake ? getScaleText(selectedQuake.earthquake.maxScale) : "-")}
+                  {isEEWMode ? (eew.MaxInt || "-") : (activeQuake ? getScaleText(activeQuake.earthquake.maxScale) : "-")}
                 </div>
               </div>
 
@@ -143,7 +253,7 @@ function Home() {
                   <div className="text-3xl font-sans font-normal transition-colors duration-300" style={{ color: currentMagColor }}>
                     {isEEWMode 
                       ? parseFloat(eew.Magunitude || eew.Magnitude || "0").toFixed(1) 
-                      : (selectedQuake && selectedQuake.earthquake.hypocenter.magnitude !== -1.0 ? selectedQuake.earthquake.hypocenter.magnitude.toFixed(1) : "不明")}
+                      : (activeQuake && activeQuake.earthquake.hypocenter.magnitude !== -1.0 ? activeQuake.earthquake.hypocenter.magnitude.toFixed(1) : "不明")}
                   </div>
                   <div className="w-2.5 h-[26px] rounded-sm transition-colors duration-300" 
                     style={{ backgroundColor: currentMagColor, boxShadow: `0 0 12px ${currentMagColor}` }}>
@@ -157,8 +267,8 @@ function Home() {
                   <div className="text-3xl font-sans font-normal flex items-baseline transition-colors duration-300" style={{ color: currentDepthColor }}>
                     {isEEWMode 
                       ? parseInt(eew.Depth || "0") 
-                      : (selectedQuake?.earthquake.hypocenter.depth === 0 ? "ごく浅い" : selectedQuake?.earthquake.hypocenter.depth || "--")}
-                    <span className="text-sm ml-1">{isEEWMode || (selectedQuake && selectedQuake.earthquake.hypocenter.depth !== 0) ? "km" : ""}</span>
+                      : (activeQuake?.earthquake.hypocenter.depth === 0 ? "ごく浅い" : activeQuake?.earthquake.hypocenter.depth || "--")}
+                    <span className="text-sm ml-1">{isEEWMode || (activeQuake && activeQuake.earthquake.hypocenter.depth !== 0) ? "km" : ""}</span>
                   </div>
                   <div className="w-2.5 h-[26px] rounded-sm transition-colors duration-300" 
                     style={{ backgroundColor: currentDepthColor, boxShadow: `0 0 12px ${currentDepthColor}` }}>
@@ -170,10 +280,15 @@ function Home() {
                 ${isEEWMode 
                   ? 'text-[#f4d03f] text-left' 
                   : 'bg-[#3c4961] text-white text-center p-3'}`}
+                style={!isEEWMode && tsunamiLevel ? {
+                  backgroundColor: getTsunamiGradeColor(tsunamiLevel),
+                  color: tsunamiLevel === 'Watch' ? '#111827' : '#fff',
+                  boxShadow: `0 0 18px ${getTsunamiGradeColor(tsunamiLevel)}66`,
+                } : undefined}
               >
                 {isEEWMode 
                   ? (isWarning ? "緊急地震速報（警報）発表\n強い揺れに警戒してください" : "緊急地震速報（予報）発表\n今後の情報に注意してください")
-                  : (selectedQuake?.earthquake.domesticTsunami === "None" ? "津波の心配なし" : "津波警報・注意報発令中")}
+                  : (tsunamiLevel ? `${getTsunamiGradeLabel(tsunamiLevel)} 発表中` : "津波の心配なし")}
               </div>
             </div>
           </div>
@@ -192,7 +307,7 @@ function Home() {
                 <div 
                   key={eq.id} 
                   className={`flex items-center bg-black/30 border border-white/5 rounded-lg p-2 gap-2 cursor-pointer transition-colors duration-200 flex-shrink-0 hover:bg-white/10
-                    ${selectedQuake?.id === eq.id ? 'ring-1 ring-[#4cd0a7] bg-white/5' : ''}`}
+                    ${activeQuake?.id === eq.id ? 'ring-1 ring-[#4cd0a7] bg-white/5' : ''}`}
                   onClick={() => setSelectedQuake(eq)}
                 >
                   <div className={`min-w-[32px] h-[32px] rounded-full flex items-center justify-center font-mono text-base border-2 border-white/20 scale-${scale}`}>
@@ -217,8 +332,48 @@ function Home() {
         <div className="text-sm text-white">{currentTime}</div>
       </div>
 
+      {activeTsunami && activeTsunami.areas.length > 0 && (
+        <div className="tsunami-panel absolute top-20 right-5 z-50 w-[360px] max-w-[calc(100vw-40px)] rounded-2xl border border-white/15 bg-[#141419]/90 p-4 text-white backdrop-blur-md shadow-2xl">
+          <div className="mb-3 flex items-start justify-between gap-3">
+            <div>
+              <div className="text-lg font-black" style={{ color: tsunamiLevel ? getTsunamiGradeColor(tsunamiLevel) : '#fff' }}>
+                {tsunamiLevel ? getTsunamiGradeLabel(tsunamiLevel) : '津波情報'} 発表中
+              </div>
+              <div className="text-xs text-white/70">津波情報 最終更新：{isTestMode ? currentTime : lastTsunamiUpdate}</div>
+            </div>
+            {isTestMode && <div className="rounded bg-white/15 px-2 py-1 text-xs font-bold">TEST</div>}
+          </div>
+          <div className="flex max-h-[250px] flex-col gap-2 overflow-y-auto pr-1">
+            {activeTsunami.areas.slice(0, 8).map(area => (
+              <div key={`${area.name}-${area.grade}`} className="rounded-lg border border-white/10 bg-black/35 p-2">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-bold">{area.name}</span>
+                  <span className="rounded px-2 py-0.5 text-xs font-black text-black" style={{ backgroundColor: getTsunamiGradeColor(area.grade) }}>
+                    {getTsunamiGradeLabel(area.grade)}
+                  </span>
+                </div>
+                <div className="mt-1 text-xs text-white/80">
+                  到達予想：{area.firstHeight?.condition || area.firstHeight?.arrivalTime || '調査中'} / 高さ：{area.maxHeight?.description || '不明'}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {isTestMode && (
+        <div className="test-mode-panel absolute bottom-16 left-[390px] z-50 w-[280px] rounded-2xl border border-yellow-300/40 bg-[#141419]/90 p-3 text-white backdrop-blur-md shadow-2xl">
+          <div className="mb-2 text-sm font-black text-yellow-300">テストモード（Shift+Tで切替）</div>
+          <div className="grid gap-2">
+            <button className="rounded-lg bg-white/10 px-3 py-2 text-left text-sm hover:bg-white/20" onClick={() => setTestScenario(createTestScenario('sanriku'))}>三陸沖 M7.4 / 津波警報</button>
+            <button className="rounded-lg bg-white/10 px-3 py-2 text-left text-sm hover:bg-white/20" onClick={() => setTestScenario(createTestScenario('nankai'))}>南海トラフ M8.0 / 大津波警報</button>
+            <button className="rounded-lg bg-white/10 px-3 py-2 text-left text-sm hover:bg-white/20" onClick={() => setTestScenario(createTestScenario('chiba'))}>千葉県東方沖 M6.8 / 注意報</button>
+          </div>
+        </div>
+      )}
+
       <div className="status-bar absolute bottom-5 right-5 z-50 bg-[#141419]/85 backdrop-blur-md px-4 py-2 rounded-full text-xs text-[#a0a0a8] transition-colors duration-300">
-        {status} | Ver 1.2.4
+        {status} | Ver 1.2.5
       </div>
 
     </div>

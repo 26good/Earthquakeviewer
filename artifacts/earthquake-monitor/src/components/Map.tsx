@@ -1,12 +1,13 @@
 import React from 'react';
 import { Circle, GeoJSON, MapContainer, Marker, useMap, ZoomControl } from 'react-leaflet';
 import L from 'leaflet';
-import { EEWData, EarthquakeHistoryItem, getIntensityColor, getScaleText } from '../lib/utils-earthquake';
+import { EEWData, EarthquakeHistoryItem, TsunamiInfo, getIntensityColor, getScaleText, getTsunamiGradeColor } from '../lib/utils-earthquake';
 import { useEffect, useState } from 'react';
 
 type Props = {
   currentQuake: EarthquakeHistoryItem | null;
   eew: EEWData | null;
+  tsunami: TsunamiInfo | null;
 };
 
 const P_WAVE_SPEED_KM_PER_SEC = 6.0;
@@ -43,10 +44,26 @@ const AutoZoomToEpicenter = ({ quake }: { quake: EarthquakeHistoryItem | null })
   return null;
 };
 
-export const EarthquakeMap = ({ currentQuake, eew }: Props) => {
+const getTsunamiAreaPrefNames = (name: string) => {
+  if (name.includes('北海道')) return ['北海道'];
+  const matches = name.match(/[^\s、]+?[都道府県]/g);
+  return matches || [];
+};
+
+export const EarthquakeMap = ({ currentQuake, eew, tsunami }: Props) => {
   const [geoData, setGeoData] = useState<any>(null);
   const [now, setNow] = useState(Date.now());
-  const hasTsunamiInfo = !!currentQuake && currentQuake.earthquake.domesticTsunami !== 'None';
+  const hasTsunamiInfo = !!tsunami && tsunami.areas.length > 0;
+  const tsunamiPrefGrades: Record<string, string> = {};
+
+  tsunami?.areas.forEach(area => {
+    getTsunamiAreaPrefNames(area.name).forEach(prefName => {
+      const current = tsunamiPrefGrades[prefName];
+      if (!current || area.grade === 'MajorWarning' || (area.grade === 'Warning' && current !== 'MajorWarning')) {
+        tsunamiPrefGrades[prefName] = area.grade;
+      }
+    });
+  });
 
   useEffect(() => {
     fetch('https://raw.githubusercontent.com/dataofjapan/land/master/japan.geojson')
@@ -68,31 +85,58 @@ export const EarthquakeMap = ({ currentQuake, eew }: Props) => {
 
   const getStyle = (feature: any) => {
     let color = '#15151b';
+    let borderColor = '#444';
+    let borderWeight = 1;
+    let opacity = 1;
+    const featureText = JSON.stringify(feature.properties);
+
     if (currentQuake) {
       for (const pref in prefScales) {
         const prefName = pref.replace(/県|府|都/, '');
-        if (JSON.stringify(feature.properties).includes(prefName)) {
+        if (featureText.includes(prefName)) {
           const scale = prefScales[pref];
           color = getIntensityColor(scale);
         }
       }
     }
+
+    for (const pref in tsunamiPrefGrades) {
+      const prefName = pref.replace(/県|府|都/, '');
+      if (featureText.includes(prefName)) {
+        borderColor = getTsunamiGradeColor(tsunamiPrefGrades[pref]);
+        borderWeight = 3.2;
+        opacity = 1;
+        break;
+      }
+    }
+
     return {
-      color: hasTsunamiInfo ? '#38bdf8' : '#444',
-      weight: hasTsunamiInfo ? 1.8 : 1,
+      color: borderColor,
+      weight: borderWeight,
       fillColor: color,
       fillOpacity: 1,
-      opacity: hasTsunamiInfo ? 0.95 : 1
+      opacity
     };
   };
 
-  const getTsunamiCoastlineStyle = () => ({
-    color: '#22d3ee',
-    weight: 4,
-    opacity: 0.9,
+  const getTsunamiCoastlineStyle = (feature: any) => {
+    let color = '#38bdf8';
+    const featureText = JSON.stringify(feature.properties);
+    for (const pref in tsunamiPrefGrades) {
+      const prefName = pref.replace(/県|府|都/, '');
+      if (featureText.includes(prefName)) {
+        color = getTsunamiGradeColor(tsunamiPrefGrades[pref]);
+        break;
+      }
+    }
+    return {
+    color,
+    weight: 5,
+    opacity: 0.92,
     fillOpacity: 0,
     className: 'tsunami-coastline-highlight',
-  });
+  };
+  };
 
   const createIcon = (scale: number) => {
     return L.divIcon({
@@ -108,20 +152,6 @@ export const EarthquakeMap = ({ currentQuake, eew }: Props) => {
     html: `×`,
     iconSize: [40, 40],
     iconAnchor: [20, 20]
-  });
-
-  const pWaveIcon = L.divIcon({
-    className: '',
-    html: `<div class="seismic-wave p-wave-ring"></div>`,
-    iconSize: [190, 190],
-    iconAnchor: [95, 95],
-  });
-
-  const sWaveIcon = L.divIcon({
-    className: '',
-    html: `<div class="seismic-wave s-wave-ring"></div>`,
-    iconSize: [270, 270],
-    iconAnchor: [135, 135],
   });
 
   const epicenter =
@@ -212,22 +242,6 @@ export const EarthquakeMap = ({ currentQuake, eew }: Props) => {
             opacity: 0.86,
             weight: 3,
           }}
-          interactive={false}
-        />
-      )}
-
-      {waveEpicenter && (
-        <Marker
-          position={[waveEpicenter.lat, waveEpicenter.lng]}
-          icon={sWaveIcon}
-          interactive={false}
-        />
-      )}
-
-      {waveEpicenter && (
-        <Marker
-          position={[waveEpicenter.lat, waveEpicenter.lng]}
-          icon={pWaveIcon}
           interactive={false}
         />
       )}

@@ -207,7 +207,7 @@
 }
 
 .tsunami-coastline-highlight {
-  filter: drop-shadow(0 0 5px rgba(34, 211, 238, 0.95)) drop-shadow(0 0 14px rgba(34, 211, 238, 0.65));
+  filter: drop-shadow(0 0 5px currentColor) drop-shadow(0 0 14px currentColor);
   animation: tsunami-coastline-pulse 1.4s ease-in-out infinite;
 }
 
@@ -273,6 +273,20 @@
     font-size: 11px !important;
   }
 
+  .tsunami-panel {
+    top: 96px !important;
+    right: 12px !important;
+    width: min(340px, calc(100vw - 24px)) !important;
+    max-height: 42dvh !important;
+    overflow: hidden;
+  }
+
+  .test-mode-panel {
+    left: 12px !important;
+    bottom: 106px !important;
+    width: min(320px, calc(100vw - 24px)) !important;
+  }
+
   .current-time-panel {
     top: auto !important;
     left: 12px !important;
@@ -334,6 +348,18 @@
     top: 52px !important;
     right: 10px !important;
     max-width: 178px;
+  }
+
+  .tsunami-panel {
+    top: 92px !important;
+    right: 10px !important;
+    width: min(300px, calc(100vw - 20px)) !important;
+    padding: 10px !important;
+  }
+
+  .test-mode-panel {
+    left: 10px !important;
+    bottom: calc(58dvh + 108px) !important;
   }
 
   .leaflet-bottom.leaflet-right {
