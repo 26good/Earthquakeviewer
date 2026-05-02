@@ -1,13 +1,17 @@
-import React from 'react';
-import { Circle, GeoJSON, MapContainer, Marker, useMap, ZoomControl } from 'react-leaflet';
+import React, { useEffect, useRef, useState } from 'react';
+import { Circle, GeoJSON, MapContainer, Marker, useMap, useMapEvents, ZoomControl } from 'react-leaflet';
 import L from 'leaflet';
 import { EEWData, EarthquakeHistoryItem, TsunamiInfo, getIntensityColor, getScaleText, getTsunamiGradeColor } from '../lib/utils-earthquake';
-import { useEffect, useState } from 'react';
+
+type UserLocation = { lat: number; lng: number } | null;
 
 type Props = {
   currentQuake: EarthquakeHistoryItem | null;
   eew: EEWData | null;
   tsunami: TsunamiInfo | null;
+  userLocation: UserLocation;
+  onSetUserLocation: (loc: UserLocation) => void;
+  settingLocation: boolean;
 };
 
 const P_WAVE_SPEED_KM_PER_SEC = 6.0;
@@ -31,7 +35,6 @@ const parseCoordinate = (value: string | number | undefined) => {
 
 const AutoZoomToEpicenter = ({ quake }: { quake: EarthquakeHistoryItem | null }) => {
   const map = useMap();
-
   useEffect(() => {
     if (!quake || quake.earthquake.hypocenter.latitude <= 0) return;
     map.flyTo(
@@ -40,22 +43,56 @@ const AutoZoomToEpicenter = ({ quake }: { quake: EarthquakeHistoryItem | null })
       { duration: 1.2 }
     );
   }, [map, quake?.id]);
-
   return null;
 };
 
-const getTsunamiAreaPrefNames = (name: string) => {
+const MapClickHandler = ({
+  settingLocation,
+  onSetUserLocation,
+}: {
+  settingLocation: boolean;
+  onSetUserLocation: (loc: UserLocation) => void;
+}) => {
+  useMapEvents({
+    click(e) {
+      if (settingLocation) {
+        onSetUserLocation({ lat: e.latlng.lat, lng: e.latlng.lng });
+      }
+    },
+  });
+  return null;
+};
+
+const getTsunamiAreaPrefNames = (name: string): string[] => {
   if (name.includes('北海道')) return ['北海道'];
   const matches = name.match(/[^\s、]+?[都道府県]/g);
   return matches || [];
 };
 
-export const EarthquakeMap = ({ currentQuake, eew, tsunami }: Props) => {
-  const [geoData, setGeoData] = useState<any>(null);
+const useAnimationNow = (active: boolean) => {
   const [now, setNow] = useState(Date.now());
+  const rafRef = useRef<number>(0);
+  useEffect(() => {
+    if (!active) return;
+    let last = 0;
+    const loop = (ts: number) => {
+      if (ts - last > 80) {
+        setNow(Date.now());
+        last = ts;
+      }
+      rafRef.current = requestAnimationFrame(loop);
+    };
+    rafRef.current = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(rafRef.current);
+  }, [active]);
+  return now;
+};
+
+export const EarthquakeMap = ({ currentQuake, eew, tsunami, userLocation, onSetUserLocation, settingLocation }: Props) => {
+  const [geoData, setGeoData] = useState<any>(null);
+
   const hasTsunamiInfo = !!tsunami && tsunami.areas.length > 0;
   const tsunamiPrefGrades: Record<string, string> = {};
-
   tsunami?.areas.forEach(area => {
     getTsunamiAreaPrefNames(area.name).forEach(prefName => {
       const current = tsunamiPrefGrades[prefName];
@@ -64,105 +101,6 @@ export const EarthquakeMap = ({ currentQuake, eew, tsunami }: Props) => {
       }
     });
   });
-
-  useEffect(() => {
-    fetch('https://raw.githubusercontent.com/dataofjapan/land/master/japan.geojson')
-      .then(r => r.json())
-      .then(data => setGeoData(data));
-  }, []);
-
-  useEffect(() => {
-    const interval = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const prefScales: Record<string, number> = {};
-  if (currentQuake) {
-    currentQuake.points.forEach(p => {
-      prefScales[p.pref] = Math.max(prefScales[p.pref] || 0, p.scale);
-    });
-  }
-
-  const getStyle = (feature: any) => {
-    let color = '#15151b';
-    let borderColor = '#444';
-    let borderWeight = 1;
-    let opacity = 1;
-    const featureText = JSON.stringify(feature.properties);
-
-    if (currentQuake) {
-      for (const pref in prefScales) {
-        const prefName = pref.replace(/県|府|都/, '');
-        if (featureText.includes(prefName)) {
-          const scale = prefScales[pref];
-          color = getIntensityColor(scale);
-        }
-      }
-    }
-
-    for (const pref in tsunamiPrefGrades) {
-      const prefName = pref.replace(/県|府|都/, '');
-      if (featureText.includes(prefName)) {
-        borderColor = getTsunamiGradeColor(tsunamiPrefGrades[pref]);
-        borderWeight = 3.2;
-        opacity = 1;
-        break;
-      }
-    }
-
-    return {
-      color: borderColor,
-      weight: borderWeight,
-      fillColor: color,
-      fillOpacity: 1,
-      opacity
-    };
-  };
-
-  const getTsunamiCoastlineStyle = (feature: any) => {
-    let color = '#38bdf8';
-    const featureText = JSON.stringify(feature.properties);
-    for (const pref in tsunamiPrefGrades) {
-      const prefName = pref.replace(/県|府|都/, '');
-      if (featureText.includes(prefName)) {
-        color = getTsunamiGradeColor(tsunamiPrefGrades[pref]);
-        break;
-      }
-    }
-    return {
-    color,
-    weight: 5,
-    opacity: 0.92,
-    fillOpacity: 0,
-    className: 'tsunami-coastline-highlight',
-  };
-  };
-
-  const createIcon = (scale: number) => {
-    return L.divIcon({
-      className: '',
-      html: `<div class="intensity-icon scale-${scale}">${getScaleText(scale)}</div>`,
-      iconSize: [32, 32],
-      iconAnchor: [16, 16]
-    });
-  };
-
-  const epicenterIcon = L.divIcon({
-    className: 'epicenter-mark',
-    html: `×`,
-    iconSize: [40, 40],
-    iconAnchor: [20, 20]
-  });
-
-  const epicenter =
-    currentQuake && currentQuake.earthquake.hypocenter.latitude > 0
-      ? {
-          lat: currentQuake.earthquake.hypocenter.latitude,
-          lng: currentQuake.earthquake.hypocenter.longitude,
-          depth: currentQuake.earthquake.hypocenter.depth,
-          time: currentQuake.earthquake.time,
-        }
-      : null;
 
   const eewEpicenter =
     eew && !eew.isCancel
@@ -175,9 +113,80 @@ export const EarthquakeMap = ({ currentQuake, eew, tsunami }: Props) => {
       : null;
 
   const waveEpicenter =
-    eewEpicenter && eewEpicenter.lat > 0 && eewEpicenter.lng > 0
-      ? eewEpicenter
-      : null;
+    eewEpicenter && eewEpicenter.lat > 0 && eewEpicenter.lng > 0 ? eewEpicenter : null;
+
+  const now = useAnimationNow(!!waveEpicenter);
+
+  useEffect(() => {
+    fetch('https://raw.githubusercontent.com/dataofjapan/land/master/japan.geojson')
+      .then(r => r.json())
+      .then(data => setGeoData(data));
+  }, []);
+
+  const prefScales: Record<string, number> = {};
+  if (currentQuake) {
+    currentQuake.points.forEach(p => {
+      prefScales[p.pref] = Math.max(prefScales[p.pref] || 0, p.scale);
+    });
+  }
+
+  const getStyle = (feature: any) => {
+    let fillColor = '#15151b';
+    let borderColor = '#3a3a50';
+    let borderWeight = 0.8;
+    const featureText = JSON.stringify(feature.properties);
+
+    if (currentQuake) {
+      for (const pref in prefScales) {
+        const prefName = pref.replace(/[県府都]$/, '');
+        if (featureText.includes(prefName)) {
+          fillColor = getIntensityColor(prefScales[pref]);
+          break;
+        }
+      }
+    }
+
+    if (hasTsunamiInfo) {
+      for (const pref in tsunamiPrefGrades) {
+        const prefName = pref.replace(/[県府都]$/, '');
+        if (featureText.includes(prefName)) {
+          borderColor = getTsunamiGradeColor(tsunamiPrefGrades[pref]);
+          borderWeight = 2.5;
+          break;
+        }
+      }
+    }
+
+    return {
+      color: borderColor,
+      weight: borderWeight,
+      fillColor,
+      fillOpacity: 1,
+      opacity: 1,
+    };
+  };
+
+  const createIcon = (scale: number) =>
+    L.divIcon({
+      className: '',
+      html: `<div class="intensity-icon scale-${scale}">${getScaleText(scale)}</div>`,
+      iconSize: [32, 32],
+      iconAnchor: [16, 16],
+    });
+
+  const epicenterIcon = L.divIcon({
+    className: 'epicenter-mark',
+    html: `×`,
+    iconSize: [40, 40],
+    iconAnchor: [20, 20],
+  });
+
+  const userLocationIcon = L.divIcon({
+    className: '',
+    html: `<div style="width:16px;height:16px;border-radius:50%;background:#38bdf8;border:3px solid #fff;box-shadow:0 0 8px #38bdf8;"></div>`,
+    iconSize: [16, 16],
+    iconAnchor: [8, 8],
+  });
 
   const pWaveRadius = waveEpicenter
     ? getWaveRadiusKm(waveEpicenter.time, waveEpicenter.depth, P_WAVE_SPEED_KM_PER_SEC, now) * 1000
@@ -186,33 +195,24 @@ export const EarthquakeMap = ({ currentQuake, eew, tsunami }: Props) => {
     ? getWaveRadiusKm(waveEpicenter.time, waveEpicenter.depth, S_WAVE_SPEED_KM_PER_SEC, now) * 1000
     : 0;
 
+  const geoKey = `${currentQuake?.id || 'default'}-${JSON.stringify(tsunamiPrefGrades)}`;
+
   return (
-    <MapContainer 
-      center={[37.5, 137.5]} 
-      zoom={5.5} 
-      zoomControl={false} 
+    <MapContainer
+      center={[37.5, 137.5]}
+      zoom={5.5}
+      zoomControl={false}
       attributionControl={false}
       minZoom={4}
       style={{ width: '100vw', height: '100vh', position: 'absolute', top: 0, left: 0, zIndex: 1 }}
+      className={settingLocation ? 'cursor-crosshair' : ''}
     >
       <AutoZoomToEpicenter quake={currentQuake} />
       <ZoomControl position="bottomright" />
-      
-      {geoData && (
-        <GeoJSON 
-          key={`${currentQuake?.id || 'default'}-${hasTsunamiInfo ? 'tsunami' : 'normal'}`} 
-          data={geoData} 
-          style={getStyle} 
-        />
-      )}
+      <MapClickHandler settingLocation={settingLocation} onSetUserLocation={onSetUserLocation} />
 
-      {geoData && hasTsunamiInfo && (
-        <GeoJSON
-          key={`${currentQuake?.id || 'default'}-coastline-alert`}
-          data={geoData}
-          style={getTsunamiCoastlineStyle}
-          interactive={false}
-        />
+      {geoData && (
+        <GeoJSON key={geoKey} data={geoData} style={getStyle} />
       )}
 
       {waveEpicenter && pWaveRadius > 0 && (
@@ -223,7 +223,7 @@ export const EarthquakeMap = ({ currentQuake, eew, tsunami }: Props) => {
             color: '#4cc9f0',
             fillColor: '#4cc9f0',
             fillOpacity: 0.04,
-            opacity: 0.78,
+            opacity: 0.85,
             weight: 2,
             dashArray: '8 8',
           }}
@@ -239,7 +239,7 @@ export const EarthquakeMap = ({ currentQuake, eew, tsunami }: Props) => {
             color: '#f97316',
             fillColor: '#f97316',
             fillOpacity: 0.06,
-            opacity: 0.86,
+            opacity: 0.9,
             weight: 3,
           }}
           interactive={false}
@@ -247,48 +247,45 @@ export const EarthquakeMap = ({ currentQuake, eew, tsunami }: Props) => {
       )}
 
       {currentQuake && currentQuake.earthquake.hypocenter.latitude > 0 && (
-        <Marker 
-          position={[currentQuake.earthquake.hypocenter.latitude, currentQuake.earthquake.hypocenter.longitude]} 
-          icon={epicenterIcon} 
+        <Marker
+          position={[currentQuake.earthquake.hypocenter.latitude, currentQuake.earthquake.hypocenter.longitude]}
+          icon={epicenterIcon}
+          interactive={false}
+        />
+      )}
+
+      {userLocation && (
+        <Marker
+          position={[userLocation.lat, userLocation.lng]}
+          icon={userLocationIcon}
           interactive={false}
         />
       )}
 
       {currentQuake && geoData && geoData.features.map((feature: any, i: number) => {
-        let matchedPref = null;
+        let matchedPref: string | null = null;
         for (const pref in prefScales) {
-          const prefName = pref.replace(/県|府|都/, '');
+          const prefName = pref.replace(/[県府都]$/, '');
           if (JSON.stringify(feature.properties).includes(prefName)) {
             matchedPref = pref;
             break;
           }
         }
+        if (!matchedPref) return null;
 
-        if (matchedPref) {
-          // Simple heuristic to place marker in the center of the first polygon ring
-          let coords = feature.geometry.coordinates[0];
-          if (feature.geometry.type === 'MultiPolygon') coords = coords[0];
-          let latSum = 0, lngSum = 0, pts = 0;
-          
-          // Using a very basic centroid calculation for visual markers
-          coords.forEach((pt: number[]) => {
-             lngSum += pt[0];
-             latSum += pt[1];
-             pts++;
-          });
-          const lat = latSum / pts;
-          const lng = lngSum / pts;
+        let coords = feature.geometry.coordinates[0];
+        if (feature.geometry.type === 'MultiPolygon') coords = coords[0];
+        let latSum = 0, lngSum = 0, pts = 0;
+        coords.forEach((pt: number[]) => { lngSum += pt[0]; latSum += pt[1]; pts++; });
 
-          return (
-            <Marker 
-              key={i} 
-              position={[lat, lng]} 
-              icon={createIcon(prefScales[matchedPref])}
-              interactive={false}
-            />
-          );
-        }
-        return null;
+        return (
+          <Marker
+            key={i}
+            position={[latSum / pts, lngSum / pts]}
+            icon={createIcon(prefScales[matchedPref])}
+            interactive={false}
+          />
+        );
       })}
     </MapContainer>
   );

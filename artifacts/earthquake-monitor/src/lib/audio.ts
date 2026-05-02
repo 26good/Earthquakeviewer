@@ -1,68 +1,98 @@
-let audioCtx: AudioContext | null = null;
+let ctx: AudioContext | null = null;
+let activeNodes: OscillatorNode[] = [];
 
 export const initAudioContext = () => {
-  if (!audioCtx) {
+  if (!ctx) {
     try {
-      audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
-    } catch (e) {
-      console.error("AudioContext is not supported", e);
-    }
+      ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    } catch {}
   }
-  if (audioCtx?.state === 'suspended') {
-    audioCtx.resume();
-  }
-  return audioCtx;
+  if (ctx?.state === 'suspended') ctx.resume();
+  return ctx;
 };
 
-const playMasterTone = (
-  f1: number, 
-  f2: number, 
-  dur: number, 
-  vol: number, 
-  type: OscillatorType = 'sine', 
-  delay = 0
-) => {
-  if (!audioCtx) return;
-  const now = audioCtx.currentTime + delay;
-  [1, 1.005].forEach(detune => {
-    if (!audioCtx) return;
-    const o = audioCtx.createOscillator();
-    const g = audioCtx.createGain();
-    o.type = type;
-    o.frequency.setValueAtTime(f1 * detune, now);
-    if (f2) o.frequency.exponentialRampToValueAtTime(f2 * detune, now + dur);
-    
-    g.gain.setValueAtTime(0, now);
-    g.gain.linearRampToValueAtTime(vol, now + 0.01);
-    g.gain.exponentialRampToValueAtTime(0.001, now + dur);
-    
-    o.connect(g);
-    g.connect(audioCtx.destination);
-    o.start(now);
-    o.stop(now + dur);
-  });
+export const getCtx = (): AudioContext | null => {
+  if (!ctx) initAudioContext();
+  if (ctx?.state === 'suspended') ctx.resume();
+  return ctx;
 };
+
+function stopAll() {
+  activeNodes.forEach(n => { try { n.stop(); } catch {} });
+  activeNodes = [];
+}
+
+function tone(
+  f1: number,
+  f2: number | null,
+  dur: number,
+  vol: number,
+  type: OscillatorType = 'sine',
+  t = 0
+) {
+  const c = getCtx();
+  if (!c) return;
+  const now = c.currentTime + t;
+
+  const o = c.createOscillator();
+  const g = c.createGain();
+
+  o.type = type;
+  o.frequency.setValueAtTime(f1, now);
+  if (f2) o.frequency.exponentialRampToValueAtTime(f2, now + dur);
+
+  g.gain.setValueAtTime(0, now);
+  g.gain.linearRampToValueAtTime(vol, now + 0.01);
+  g.gain.exponentialRampToValueAtTime(0.001, now + dur);
+
+  o.connect(g);
+  g.connect(c.destination);
+
+  o.start(now);
+  o.stop(now + dur);
+
+  activeNodes.push(o);
+}
 
 export const playSound = {
   detect: () => {
-    playMasterTone(400, 350, 0.18, 0.3);
-    playMasterTone(550, 500, 0.22, 0.3, 'sine', 0.1);
+    stopAll();
+    tone(550, 450, 0.18, 0.25);
+    tone(650, 500, 0.2, 0.2, 'sine', 0.08);
   },
   update: () => {
-    playMasterTone(450, 400, 0.12, 0.25);
+    stopAll();
+    tone(450, null, 0.08, 0.2);
   },
-  urgent: () => {
-    playMasterTone(200, 60, 0.8, 0.4, 'triangle');
-    playMasterTone(205, 65, 0.8, 0.2, 'sine', 0.01);
+  caution: () => {
+    stopAll();
+    tone(800, 500, 0.2, 0.3);
+    tone(600, 400, 0.2, 0.3, 'sine', 0.2);
+  },
+  alert: () => {
+    stopAll();
+    for (let i = 0; i < 3; i++) {
+      const t = i * 0.6;
+      tone(300, 1400, 0.5, 0.6, 'square', t);
+      tone(310, 1410, 0.5, 0.3, 'square', t + 0.02);
+    }
+  },
+  end: () => {
+    stopAll();
+    tone(500, 350, 0.18, 0.2);
+    tone(400, 300, 0.2, 0.15, 'sine', 0.08);
   },
   final: () => {
-    playMasterTone(320, 300, 0.25, 0.25);
-    playMasterTone(240, 220, 0.4, 0.25, 'sine', 0.2);
+    stopAll();
+    tone(500, 350, 0.18, 0.2);
+    tone(400, 300, 0.2, 0.15, 'sine', 0.08);
   },
   tsunamiDanger: () => {
-    playMasterTone(180, 70, 1.1, 1.0, 'sawtooth');
-    playMasterTone(720, 520, 0.45, 0.95, 'square', 0.02);
-    playMasterTone(180, 70, 1.1, 1.0, 'sawtooth', 0.7);
-    playMasterTone(720, 520, 0.45, 0.95, 'square', 0.72);
-  }
+    stopAll();
+    for (let i = 0; i < 3; i++) {
+      const t = i * 0.6;
+      tone(300, 1400, 0.5, 0.6, 'square', t);
+      tone(310, 1410, 0.5, 0.3, 'square', t + 0.02);
+    }
+  },
 };

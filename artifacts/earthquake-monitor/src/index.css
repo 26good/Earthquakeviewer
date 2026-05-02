@@ -206,19 +206,7 @@
   border-radius: 999px;
 }
 
-.tsunami-coastline-highlight {
-  filter: drop-shadow(0 0 5px currentColor) drop-shadow(0 0 14px currentColor);
-  animation: tsunami-coastline-pulse 1.4s ease-in-out infinite;
-}
-
-@keyframes tsunami-coastline-pulse {
-  0%, 100% {
-    opacity: 0.5;
-  }
-  50% {
-    opacity: 1;
-  }
-}
+/* tsunami-coastline-highlight removed: county border coloring is done via GeoJSON style prop only */
 
 /* Map overrides */
 .leaflet-container {
