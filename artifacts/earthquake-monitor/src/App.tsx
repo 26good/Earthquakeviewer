@@ -5,7 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useState, useEffect, useCallback } from 'react';
 import NotFound from "@/pages/not-found";
-import { initAudioContext } from './lib/audio';
+import { initAudioContext, playSound } from './lib/audio';
 import { useEarthquakes } from './hooks/use-earthquakes';
 import { useEEW } from './hooks/use-eew';
 import { useTsunami } from './hooks/use-tsunami';
@@ -161,11 +161,20 @@ function Home() {
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.shiftKey && e.key.toLowerCase() === 't') setIsTestMode(prev => !prev);
+      if (e.shiftKey && e.key.toLowerCase() === 't') {
+        setIsTestMode(prev => {
+          const next = !prev;
+          if (next && isSoundEnabled) {
+            initAudioContext();
+            playSound.detect();
+          }
+          return next;
+        });
+      }
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, []);
+  }, [isSoundEnabled]);
 
   const handleSoundToggle = () => {
     if (!isSoundEnabled) initAudioContext();
@@ -532,9 +541,18 @@ function Home() {
         <div className="test-mode-panel absolute bottom-16 left-[390px] z-50 w-[280px] rounded-2xl border border-yellow-300/40 bg-[#141419]/90 p-3 text-white backdrop-blur-md shadow-2xl">
           <div className="mb-2 text-sm font-black text-yellow-300">テストモード（Shift+Tで切替）</div>
           <div className="grid gap-2">
-            <button className="rounded-lg bg-white/10 px-3 py-2 text-left text-sm hover:bg-white/20 cursor-pointer" onClick={() => setTestScenario(createTestScenario('sanriku'))}>三陸沖 M7.4 / 津波警報</button>
-            <button className="rounded-lg bg-white/10 px-3 py-2 text-left text-sm hover:bg-white/20 cursor-pointer" onClick={() => setTestScenario(createTestScenario('nankai'))}>南海トラフ M8.0 / 大津波警報</button>
-            <button className="rounded-lg bg-white/10 px-3 py-2 text-left text-sm hover:bg-white/20 cursor-pointer" onClick={() => setTestScenario(createTestScenario('chiba'))}>千葉県東方沖 M6.8 / 注意報</button>
+            <button className="rounded-lg bg-white/10 px-3 py-2 text-left text-sm hover:bg-white/20 cursor-pointer" onClick={() => {
+              setTestScenario(createTestScenario('sanriku'));
+              if (isSoundEnabled) { initAudioContext(); playSound.alert(); }
+            }}>三陸沖 M7.4 / 津波警報</button>
+            <button className="rounded-lg bg-white/10 px-3 py-2 text-left text-sm hover:bg-white/20 cursor-pointer" onClick={() => {
+              setTestScenario(createTestScenario('nankai'));
+              if (isSoundEnabled) { initAudioContext(); playSound.alert(); }
+            }}>南海トラフ M8.0 / 大津波警報</button>
+            <button className="rounded-lg bg-white/10 px-3 py-2 text-left text-sm hover:bg-white/20 cursor-pointer" onClick={() => {
+              setTestScenario(createTestScenario('chiba'));
+              if (isSoundEnabled) { initAudioContext(); playSound.caution(); }
+            }}>千葉県東方沖 M6.8 / 注意報</button>
           </div>
         </div>
       )}
