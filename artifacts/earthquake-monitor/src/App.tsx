@@ -191,6 +191,28 @@ function Home() {
   const isEEWMode = !!eew;
   const isWarning = eew?.Title?.includes('警報');
 
+  // Synthetic EEW for P/S wave animation in test mode (when no real EEW is active)
+  const testEEWData: import('./lib/utils-earthquake').EEWData | null = isTestMode && !eew
+    ? {
+        type: 'jma_eew',
+        isCancel: false,
+        isFinal: false,
+        Title: '緊急地震速報（テスト）',
+        Hypocenter: testScenario.quake.earthquake.hypocenter.name,
+        OriginTime: testScenario.quake.time,
+        MaxInt: getScaleText(testScenario.quake.earthquake.maxScale),
+        Magnitude: testScenario.quake.earthquake.hypocenter.magnitude.toString(),
+        Latitude: testScenario.quake.earthquake.hypocenter.latitude,
+        Longitude: testScenario.quake.earthquake.hypocenter.longitude,
+        Depth: testScenario.quake.earthquake.hypocenter.depth.toString(),
+        Serial: '1',
+      }
+    : null;
+
+  // waveEEW drives P/S circle display — real EEW takes priority, test EEW fills in
+  const waveEEW = eew || testEEWData;
+  const showWaveLegend = !!waveEEW;
+
   const tsunamiLevel =
     activeTsunami?.areas.some(a => a.grade === 'MajorWarning') ? 'MajorWarning' :
     activeTsunami?.areas.some(a => a.grade === 'Warning') ? 'Warning' :
@@ -208,15 +230,15 @@ function Home() {
   const currentMagColor = getMagColor(currentMagnitude);
   const currentDepthColor = getDepthColor(currentDepth);
 
-  // EEW countdown for user location
+  // EEW countdown for user location — works with both real and test EEW
   type Countdown = { pSec: number | null; sSec: number | null; distKm: number };
   let countdown: Countdown | null = null;
-  if (isEEWMode && userLocation && eew) {
-    const epiLat = parseCoordinate(eew.Latitude ?? eew.latitude);
-    const epiLng = parseCoordinate(eew.Longitude ?? eew.longitude);
+  if (showWaveLegend && userLocation && waveEEW) {
+    const epiLat = parseCoordinate(waveEEW.Latitude ?? waveEEW.latitude);
+    const epiLng = parseCoordinate(waveEEW.Longitude ?? waveEEW.longitude);
     if (epiLat !== 0 && epiLng !== 0) {
       const distKm = haversineKm(userLocation.lat, userLocation.lng, epiLat, epiLng);
-      const originTs = new Date(eew.OriginTime?.replace(/-/g, '/')).getTime();
+      const originTs = new Date(waveEEW.OriginTime?.replace(/-/g, '/')).getTime();
       const elapsedSec = Number.isFinite(originTs) ? Math.max(0, (Date.now() - originTs) / 1000) : 0;
       const pSec = Math.round(distKm / P_WAVE_SPEED - elapsedSec);
       const sSec = Math.round(distKm / S_WAVE_SPEED - elapsedSec);
@@ -229,15 +251,15 @@ function Home() {
     setSettingLocation(false);
   }, []);
 
-  // P/S wave elapsed seconds and radii
+  // P/S wave elapsed seconds and radii — works with both real and test EEW
   let eewElapsedSec = 0;
   let pRadiusKm = 0;
   let sRadiusKm = 0;
-  if (isEEWMode && eew) {
-    const originTs = new Date(eew.OriginTime?.replace(/-/g, '/')).getTime();
+  if (showWaveLegend && waveEEW) {
+    const originTs = new Date(waveEEW.OriginTime?.replace(/-/g, '/')).getTime();
     if (Number.isFinite(originTs)) {
       eewElapsedSec = Math.max(0, (Date.now() - originTs) / 1000);
-      const depth = parseInt(eew.Depth || '0') || 0;
+      const depth = parseInt(waveEEW.Depth || '0') || 0;
       const pTravel = eewElapsedSec * P_WAVE_SPEED;
       const sTravel = eewElapsedSec * S_WAVE_SPEED;
       pRadiusKm = Math.min(Math.sqrt(Math.max(0, pTravel ** 2 - depth ** 2)), 2500);
@@ -249,7 +271,7 @@ function Home() {
     <div className="relative w-full h-screen bg-black overflow-hidden font-sans text-white dark">
       <EarthquakeMap
         currentQuake={activeQuake}
-        eew={eew}
+        eew={waveEEW}
         tsunami={activeTsunami}
         userLocation={userLocation}
         onSetUserLocation={handleSetUserLocation}
@@ -269,7 +291,7 @@ function Home() {
       </button>
 
       {/* EEW P/S wave legend */}
-      {isEEWMode && (
+      {showWaveLegend && (
         <div className="wave-legend absolute top-20 right-5 z-50 rounded-2xl border border-white/10 bg-[#141419]/85 px-4 py-3 text-xs text-white/80 backdrop-blur-md shadow-2xl min-w-[170px]">
           <div className="mb-2 font-bold text-white">P波・S波 推定到達範囲</div>
           <div className="flex items-center gap-2 mb-1">
@@ -485,7 +507,7 @@ function Home() {
       {/* Tsunami panel */}
       {activeTsunami && activeTsunami.areas.length > 0 && (
         <div className={`tsunami-panel absolute top-20 right-5 z-50 w-[360px] max-w-[calc(100vw-40px)] rounded-2xl border bg-[#141419]/92 p-4 text-white backdrop-blur-md shadow-2xl
-          ${isEEWMode ? 'hidden' : ''}`}
+          ${showWaveLegend ? 'hidden' : ''}`}
           style={{ borderColor: tsunamiLevel ? `${getTsunamiGradeColor(tsunamiLevel)}55` : 'rgba(255,255,255,0.15)' }}
         >
           <div className="mb-3 flex items-start justify-between gap-3">
