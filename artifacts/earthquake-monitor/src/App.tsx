@@ -8,7 +8,9 @@ import { initAudioContext } from './lib/audio';
 import { useEarthquakes } from './hooks/use-earthquakes';
 import { useEEW } from './hooks/use-eew';
 import { useTsunami } from './hooks/use-tsunami';
+import { useNotifications } from './hooks/use-notifications';
 import { EarthquakeMap } from './components/Map';
+import type { TsunamiSource } from './components/Map';
 import {
   getScaleText,
   getMagColor,
@@ -62,7 +64,6 @@ const CITY_PRESETS = [
 
 type UserLocation = { lat: number; lng: number; label?: string } | null;
 
-// Load/save location from localStorage so it persists across reloads
 const loadSavedLocation = (): UserLocation => {
   try {
     const s = localStorage.getItem('user_location_v1');
@@ -76,15 +77,25 @@ const saveLocation = (loc: UserLocation) => {
   } catch {}
 };
 
+// Intensity scale labels for the observation points panel
+const SCALE_LABELS: Record<number, string> = {
+  10: '1', 20: '2', 30: '3', 40: '4', 45: '5弱', 50: '5強', 55: '6弱', 60: '6強', 70: '7',
+};
+
 function Home() {
   const [isSoundEnabled, setIsSoundEnabled] = useState(true);
   const [currentTime, setCurrentTime] = useState(formatClockTime);
   const [userLocation, setUserLocation] = useState<UserLocation>(loadSavedLocation);
   const [settingLocation, setSettingLocation] = useState(false);
   const [showLocationPanel, setShowLocationPanel] = useState(false);
+  const [bottomTab, setBottomTab] = useState<'history' | 'points'>('history');
   const locationPanelRef = useRef<HTMLDivElement>(null);
 
-  // Resume audio context on any interaction
+  const { isEnabled: notifEnabled, permission: notifPermission, toggle: toggleNotif, notify } = useNotifications();
+  const notifyRef = useRef(notify);
+  notifyRef.current = notify;
+
+  // Audio resume
   useEffect(() => {
     const resume = () => initAudioContext();
     window.addEventListener('pointerdown', resume);
@@ -101,7 +112,7 @@ function Home() {
     return () => clearInterval(id);
   }, []);
 
-  // Close location panel when clicking outside
+  // Close location panel outside click
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (locationPanelRef.current && !locationPanelRef.current.contains(e.target as Node)) {
@@ -112,7 +123,7 @@ function Home() {
     return () => document.removeEventListener('mousedown', handler);
   }, [settingLocation]);
 
-  // Cancel location-setting mode with Escape
+  // Escape cancels location setting
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setSettingLocation(false);
@@ -133,19 +144,51 @@ function Home() {
     setShowLocationPanel(false);
   }, []);
 
-  const handleCitySelect = (city: typeof CITY_PRESETS[number]) => {
-    const loc = { lat: city.lat, lng: city.lng, label: city.label };
-    handleSetUserLocation(loc);
-  };
-
-  const handleMapClick = () => {
-    setSettingLocation(true);
-    setShowLocationPanel(false);
-  };
-
   const { history, selectedQuake, setSelectedQuake, lastUpdate } = useEarthquakes(isSoundEnabled);
   const { eew, status } = useEEW(isSoundEnabled);
   const { tsunami, lastTsunamiUpdate } = useTsunami(isSoundEnabled);
+
+  // ── Notification triggers ──────────────────────────────────────────────
+  const lastNotifiedQuakeRef = useRef<string | null>(null);
+  const lastNotifiedEEWRef = useRef<string | null>(null);
+  const lastNotifiedTsunamiRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!selectedQuake) return;
+    if (lastNotifiedQuakeRef.current === selectedQuake.id) return;
+    lastNotifiedQuakeRef.current = selectedQuake.id;
+    notifyRef.current(
+      `quake-${selectedQuake.id}`,
+      `地震発生 — ${selectedQuake.earthquake.hypocenter.name}`,
+      `最大震度 ${getScaleText(selectedQuake.earthquake.maxScale)} / M${selectedQuake.earthquake.hypocenter.magnitude}`
+    );
+  }, [selectedQuake?.id]);
+
+  useEffect(() => {
+    if (!eew) return;
+    const key = `${eew.Serial}`;
+    if (lastNotifiedEEWRef.current === key) return;
+    lastNotifiedEEWRef.current = key;
+    notifyRef.current(
+      `eew-${key}`,
+      eew.Title || '緊急地震速報',
+      `${eew.Hypocenter} 推定最大震度 ${eew.MaxInt} / M${eew.Magunitude || eew.Magnitude}`
+    );
+  }, [eew?.Serial]);
+
+  useEffect(() => {
+    if (!tsunami) return;
+    if (lastNotifiedTsunamiRef.current === tsunami.id) return;
+    lastNotifiedTsunamiRef.current = tsunami.id;
+    const level = tsunami.areas.some(a => a.grade === 'MajorWarning') ? 'MajorWarning'
+      : tsunami.areas.some(a => a.grade === 'Warning') ? 'Warning' : 'Watch';
+    notifyRef.current(
+      `tsunami-${tsunami.id}`,
+      `${getTsunamiGradeLabel(level)} 発表`,
+      tsunami.areas.slice(0, 4).map(a => a.name).join('・')
+    );
+  }, [tsunami?.id]);
+  // ────────────────────────────────────────────────────────────────────────
 
   const displayData = eew || selectedQuake;
   const isEEWMode = !!eew;
@@ -155,6 +198,17 @@ function Home() {
     tsunami?.areas.some(a => a.grade === 'MajorWarning') ? 'MajorWarning' :
     tsunami?.areas.some(a => a.grade === 'Warning') ? 'Warning' :
     tsunami?.areas.some(a => a.grade === 'Watch') ? 'Watch' : null;
+
+  // Tsunami simulation source — use selected quake's epicenter when tsunami is active
+  const tsunamiSource: TsunamiSource =
+    tsunami && !tsunami.cancelled && selectedQuake && selectedQuake.earthquake.hypocenter.latitude > 0
+      ? {
+          lat: selectedQuake.earthquake.hypocenter.latitude,
+          lng: selectedQuake.earthquake.hypocenter.longitude,
+          time: selectedQuake.time,
+          grade: tsunamiLevel || 'Watch',
+        }
+      : null;
 
   const currentMagnitude = isEEWMode
     ? parseFloat(eew.Magunitude || eew.Magnitude || '0')
@@ -168,7 +222,7 @@ function Home() {
   const currentMagColor = getMagColor(currentMagnitude);
   const currentDepthColor = getDepthColor(currentDepth);
 
-  // P/S wave radius display (updates via currentTime ticker in parent)
+  // P/S wave radii for the wave legend
   let eewElapsedSec = 0;
   let pRadiusKm = 0;
   let sRadiusKm = 0;
@@ -182,7 +236,7 @@ function Home() {
     }
   }
 
-  // Countdown to user's location
+  // EEW countdown to user's location
   type Countdown = { pSec: number | null; sSec: number | null; distKm: number };
   let countdown: Countdown | null = null;
   if (isEEWMode && userLocation && eew) {
@@ -198,20 +252,27 @@ function Home() {
     }
   }
 
+  // Observation points sorted by scale (highest first)
+  const sortedPoints = selectedQuake
+    ? [...selectedQuake.points].sort((a, b) => b.scale - a.scale)
+    : [];
+
   return (
     <div className="relative w-full h-screen bg-black overflow-hidden font-sans text-white dark">
       <EarthquakeMap
         currentQuake={selectedQuake}
         eew={eew}
         tsunami={tsunami}
+        tsunamiSource={tsunamiSource}
         userLocation={userLocation}
         onSetUserLocation={handleSetUserLocation}
         settingLocation={settingLocation}
       />
 
-      {/* Top-right buttons row */}
+      {/* Top-right button row */}
       <div className="absolute top-5 right-5 z-50 flex items-center gap-2">
-        {/* Location button — always visible */}
+
+        {/* Location button */}
         <div ref={locationPanelRef} className="relative">
           <button
             onClick={() => {
@@ -228,7 +289,6 @@ function Home() {
             📍 {settingLocation ? '地図をクリック...' : (userLocation?.label ?? (userLocation ? `${userLocation.lat.toFixed(2)},${userLocation.lng.toFixed(2)}` : '位置を設定'))}
           </button>
 
-          {/* Location picker dropdown */}
           {showLocationPanel && !settingLocation && (
             <div className="absolute top-full right-0 mt-2 w-64 rounded-2xl border border-white/15 bg-[#141419]/95 p-3 shadow-2xl backdrop-blur-md">
               <div className="mb-2 text-xs font-bold text-white/60">都市から選ぶ</div>
@@ -240,7 +300,7 @@ function Home() {
                       ${userLocation?.label === city.label
                         ? 'bg-[#38bdf8]/30 text-[#38bdf8] border border-[#38bdf8]/40'
                         : 'bg-white/8 hover:bg-white/15 text-white/80'}`}
-                    onClick={() => handleCitySelect(city)}
+                    onClick={() => handleSetUserLocation({ lat: city.lat, lng: city.lng, label: city.label })}
                   >
                     {city.label}
                   </button>
@@ -248,7 +308,7 @@ function Home() {
               </div>
               <button
                 className="w-full rounded-lg bg-[#38bdf8]/15 border border-[#38bdf8]/30 px-3 py-2 text-xs font-bold text-[#38bdf8] hover:bg-[#38bdf8]/25 cursor-pointer mb-1"
-                onClick={handleMapClick}
+                onClick={() => { setSettingLocation(true); setShowLocationPanel(false); }}
               >
                 🗺 地図をクリックして設定
               </button>
@@ -263,6 +323,23 @@ function Home() {
             </div>
           )}
         </div>
+
+        {/* Notification bell */}
+        <button
+          onClick={toggleNotif}
+          title={
+            notifPermission === 'denied' ? '通知がブロックされています（ブラウザ設定を確認）'
+            : notifEnabled ? '通知 ON（クリックで OFF）' : '通知 OFF（クリックで許可）'
+          }
+          className={`rounded-full px-4 py-2 text-sm font-bold transition-all duration-300 backdrop-blur-md border cursor-pointer
+            ${notifEnabled
+              ? 'text-yellow-300 border-yellow-400/60 bg-yellow-400/10'
+              : notifPermission === 'denied'
+                ? 'text-red-400/60 border-red-400/20 bg-black/40'
+                : 'text-[#a0a0a8] border-white/20 bg-black/50'}`}
+        >
+          {notifEnabled ? '🔔 通知 ON' : notifPermission === 'denied' ? '🔕 通知拒否' : '🔕 通知 OFF'}
+        </button>
 
         {/* Sound toggle */}
         <button
@@ -290,27 +367,34 @@ function Home() {
             <span>S波 約 <b>{Math.round(sRadiusKm)}</b> km</span>
           </div>
           <div className="text-white/40">経過 {Math.floor(eewElapsedSec)} 秒</div>
-
-          {/* Countdown to user location */}
           {userLocation && countdown && (
             <div className="mt-3 border-t border-white/10 pt-2 space-y-0.5">
-              <div className="text-white/70 mb-1 font-semibold">
-                {userLocation.label ?? '設定地点'} まで
-              </div>
-              <div className="text-[#4cc9f0]">
-                P波: {countdown.pSec !== null ? `約 ${countdown.pSec} 秒後` : '通過済み'}
-              </div>
-              <div className="text-[#f97316]">
-                S波: {countdown.sSec !== null ? `約 ${countdown.sSec} 秒後` : '通過済み'}
-              </div>
+              <div className="text-white/70 mb-1 font-semibold">{userLocation.label ?? '設定地点'} まで</div>
+              <div className="text-[#4cc9f0]">P波: {countdown.pSec !== null ? `約 ${countdown.pSec} 秒後` : '通過済み'}</div>
+              <div className="text-[#f97316]">S波: {countdown.sSec !== null ? `約 ${countdown.sSec} 秒後` : '通過済み'}</div>
               <div className="text-white/35 pt-0.5">距離 {Math.round(countdown.distKm)} km</div>
             </div>
           )}
           {isEEWMode && !userLocation && (
-            <div className="mt-2 text-white/35 text-[11px]">
-              📍 位置を設定すると到達時刻を表示
-            </div>
+            <div className="mt-2 text-white/35 text-[11px]">📍 位置を設定すると到達時刻を表示</div>
           )}
+        </div>
+      )}
+
+      {/* Tsunami simulation legend */}
+      {tsunamiSource && !isEEWMode && (
+        <div className="absolute top-20 right-5 z-50 rounded-2xl border bg-[#141419]/85 px-4 py-3 text-xs text-white/80 backdrop-blur-md shadow-2xl min-w-[185px]"
+          style={{ borderColor: `${getTsunamiGradeColor(tsunamiSource.grade)}44` }}
+        >
+          <div className="mb-2 font-bold" style={{ color: getTsunamiGradeColor(tsunamiSource.grade) }}>
+            🌊 津波伝播シミュレーション
+          </div>
+          <div className="flex items-center gap-2 mb-1">
+            <span className="h-2 w-8 rounded-full border shrink-0" style={{ borderColor: getTsunamiGradeColor(tsunamiSource.grade) }}></span>
+            <span>津波波面（推定）</span>
+          </div>
+          <div className="text-white/40 text-[11px] mt-1">速度 約 720 km/h（外洋）</div>
+          <div className="text-white/35 text-[11px]">※ 海底地形により実際の到達は異なります</div>
         </div>
       )}
 
@@ -342,7 +426,7 @@ function Home() {
               <div className="mb-4 flex flex-col-reverse">
                 <div className="text-2xl font-black leading-tight">
                   {isEEWMode
-                    ? (eew.Hypocenter && eew.Hypocenter.length > 0 ? eew.Hypocenter : '震源調査中')
+                    ? (eew.Hypocenter?.length > 0 ? eew.Hypocenter : '震源調査中')
                     : selectedQuake?.earthquake.hypocenter.name}
                   <span className="text-sm font-normal ml-2">
                     {isEEWMode ? 'で地震' : 'で地震がありました'}
@@ -359,8 +443,7 @@ function Home() {
                 </div>
               </div>
 
-              <div
-                className="flex items-center justify-between p-3 rounded-lg mb-4 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.16)] transition-colors duration-300"
+              <div className="flex items-center justify-between p-3 rounded-lg mb-4 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.16)]"
                 style={{ backgroundColor: currentIntensityColor }}
               >
                 <div className="text-lg font-black leading-tight">
@@ -426,35 +509,98 @@ function Home() {
           </div>
         )}
 
-        <div className="glass-panel flex-grow flex flex-col overflow-hidden min-h-0 p-3 rounded-xl pointer-events-auto">
-          <div className="flex justify-between items-center mb-3">
-            <h2 className="text-sm m-0 text-[#a0a0a8]">地震履歴</h2>
-            <span className="text-sm text-white">最終更新：{lastUpdate}</span>
+        {/* Bottom tab panel: 地震履歴 / 観測地点 */}
+        <div className="glass-panel flex-grow flex flex-col overflow-hidden min-h-0 rounded-xl pointer-events-auto">
+          {/* Tab bar */}
+          <div className="flex border-b border-white/10 flex-shrink-0">
+            <button
+              className={`flex-1 py-2 text-sm font-bold transition-colors cursor-pointer
+                ${bottomTab === 'history' ? 'text-white border-b-2 border-[#4cd0a7]' : 'text-[#a0a0a8] hover:text-white'}`}
+              onClick={() => setBottomTab('history')}
+            >
+              地震履歴
+            </button>
+            <button
+              className={`flex-1 py-2 text-sm font-bold transition-colors cursor-pointer relative
+                ${bottomTab === 'points' ? 'text-white border-b-2 border-[#4cd0a7]' : 'text-[#a0a0a8] hover:text-white'}`}
+              onClick={() => setBottomTab('points')}
+            >
+              観測地点
+              {selectedQuake && (
+                <span className="ml-1 text-xs text-white/40">({sortedPoints.length})</span>
+              )}
+            </button>
           </div>
-          <div className="history-list overflow-y-auto flex-grow flex flex-col gap-2 p-px custom-scrollbar">
-            {history.map(eq => {
-              const scale = eq.earthquake.maxScale;
-              const timeStr = eq.earthquake.time.substring(5, 16).replace('-', '/');
-              return (
-                <div
-                  key={eq.id}
-                  className={`flex items-center bg-black/30 border border-white/5 rounded-lg p-2 gap-2 cursor-pointer transition-colors duration-200 flex-shrink-0 hover:bg-white/10
-                    ${selectedQuake?.id === eq.id ? 'ring-1 ring-[#4cd0a7] bg-white/5' : ''}`}
-                  onClick={() => setSelectedQuake(eq)}
-                >
-                  <div className={`min-w-[32px] h-[32px] rounded-full flex items-center justify-center font-mono text-base border-2 border-white/20 scale-${scale}`}>
-                    {getScaleText(scale)}
-                  </div>
-                  <div className="flex flex-col flex-grow overflow-hidden">
-                    <div className="text-[0.65rem] text-[#a0a0a8]">{timeStr}</div>
-                    <div className="text-[0.85rem] font-bold whitespace-nowrap overflow-hidden text-ellipsis">
-                      {eq.earthquake.hypocenter.name}
+
+          {bottomTab === 'history' && (
+            <div className="flex flex-col overflow-hidden flex-grow p-3">
+              <div className="flex justify-between items-center mb-3">
+                <span className="text-xs text-[#a0a0a8]">最終更新：{lastUpdate}</span>
+              </div>
+              <div className="history-list overflow-y-auto flex-grow flex flex-col gap-2 p-px custom-scrollbar">
+                {history.map(eq => {
+                  const scale = eq.earthquake.maxScale;
+                  const timeStr = eq.earthquake.time.substring(5, 16).replace('-', '/');
+                  return (
+                    <div
+                      key={eq.id}
+                      className={`flex items-center bg-black/30 border border-white/5 rounded-lg p-2 gap-2 cursor-pointer transition-colors duration-200 flex-shrink-0 hover:bg-white/10
+                        ${selectedQuake?.id === eq.id ? 'ring-1 ring-[#4cd0a7] bg-white/5' : ''}`}
+                      onClick={() => setSelectedQuake(eq)}
+                    >
+                      <div className={`min-w-[32px] h-[32px] rounded-full flex items-center justify-center font-mono text-base border-2 border-white/20 scale-${scale}`}>
+                        {getScaleText(scale)}
+                      </div>
+                      <div className="flex flex-col flex-grow overflow-hidden">
+                        <div className="text-[0.65rem] text-[#a0a0a8]">{timeStr}</div>
+                        <div className="text-[0.85rem] font-bold whitespace-nowrap overflow-hidden text-ellipsis">
+                          {eq.earthquake.hypocenter.name}
+                        </div>
+                      </div>
                     </div>
-                  </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {bottomTab === 'points' && (
+            <div className="flex flex-col overflow-hidden flex-grow p-3">
+              {!selectedQuake ? (
+                <div className="flex-grow flex items-center justify-center text-white/30 text-sm">
+                  地震を選択してください
                 </div>
-              );
-            })}
-          </div>
+              ) : (
+                <>
+                  <div className="text-xs text-[#a0a0a8] mb-2 flex-shrink-0">
+                    {selectedQuake.earthquake.hypocenter.name} — {sortedPoints.length} 観測点
+                  </div>
+                  <div className="overflow-y-auto flex-grow flex flex-col gap-1 custom-scrollbar">
+                    {sortedPoints.map((pt, i) => {
+                      const color = getIntensityColor(pt.scale);
+                      const label = SCALE_LABELS[pt.scale] || '?';
+                      return (
+                        <div key={i} className="flex items-center gap-2 rounded-lg bg-black/25 px-2 py-1.5 border border-white/5 flex-shrink-0">
+                          <div
+                            className="min-w-[28px] h-[28px] rounded-full flex items-center justify-center text-xs font-black text-white shrink-0"
+                            style={{ backgroundColor: color }}
+                          >
+                            {label}
+                          </div>
+                          <div className="flex flex-col overflow-hidden">
+                            <div className="text-[0.75rem] font-bold text-white/90 whitespace-nowrap overflow-hidden text-ellipsis">
+                              {pt.addr || pt.pref}
+                            </div>
+                            <div className="text-[0.65rem] text-white/40">{pt.pref}</div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -464,20 +610,18 @@ function Home() {
         <div className="text-sm text-white">{currentTime}</div>
       </div>
 
-      {/* Tsunami panel — hidden when EEW wave legend is showing (right side conflict) */}
+      {/* Tsunami panel */}
       {tsunami && tsunami.areas.length > 0 && (
         <div
           className={`tsunami-panel absolute top-20 right-5 z-50 w-[360px] max-w-[calc(100vw-40px)] rounded-2xl border bg-[#141419]/92 p-4 text-white backdrop-blur-md shadow-2xl
-            ${isEEWMode ? 'hidden' : ''}`}
+            ${isEEWMode || tsunamiSource ? 'hidden' : ''}`}
           style={{ borderColor: tsunamiLevel ? `${getTsunamiGradeColor(tsunamiLevel)}55` : 'rgba(255,255,255,0.15)' }}
         >
-          <div className="mb-3 flex items-start justify-between gap-3">
-            <div>
-              <div className="text-lg font-black" style={{ color: tsunamiLevel ? getTsunamiGradeColor(tsunamiLevel) : '#fff' }}>
-                {tsunamiLevel ? getTsunamiGradeLabel(tsunamiLevel) : '津波情報'} 発表中
-              </div>
-              <div className="text-xs text-white/60">最終更新：{lastTsunamiUpdate}</div>
+          <div className="mb-3">
+            <div className="text-lg font-black" style={{ color: tsunamiLevel ? getTsunamiGradeColor(tsunamiLevel) : '#fff' }}>
+              {tsunamiLevel ? getTsunamiGradeLabel(tsunamiLevel) : '津波情報'} 発表中
             </div>
+            <div className="text-xs text-white/60">最終更新：{lastTsunamiUpdate}</div>
           </div>
           <div className="flex max-h-[260px] flex-col gap-2 overflow-y-auto pr-1 custom-scrollbar">
             {tsunami.areas.map(area => {
@@ -522,7 +666,7 @@ function Home() {
 
       {/* Status bar */}
       <div className="status-bar absolute bottom-5 right-5 z-50 bg-[#141419]/85 backdrop-blur-md px-4 py-2 rounded-full text-xs text-[#a0a0a8]">
-        {status} | Ver 1.4.0
+        {status} | Ver 1.5.0
       </div>
     </div>
   );

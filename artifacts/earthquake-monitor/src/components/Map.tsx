@@ -5,10 +5,18 @@ import { EEWData, EarthquakeHistoryItem, TsunamiInfo, getIntensityColor, getScal
 
 type UserLocation = { lat: number; lng: number } | null;
 
+export type TsunamiSource = {
+  lat: number;
+  lng: number;
+  time: string;
+  grade: string;
+} | null;
+
 type Props = {
   currentQuake: EarthquakeHistoryItem | null;
   eew: EEWData | null;
   tsunami: TsunamiInfo | null;
+  tsunamiSource: TsunamiSource;
   userLocation: UserLocation;
   onSetUserLocation: (loc: UserLocation) => void;
   settingLocation: boolean;
@@ -16,6 +24,7 @@ type Props = {
 
 const P_WAVE_SPEED_KM_PER_SEC = 6.0;
 const S_WAVE_SPEED_KM_PER_SEC = 3.5;
+const TSUNAMI_SPEED_KM_PER_SEC = 0.2; // ~720 km/h open ocean
 const MAX_WAVE_RADIUS_KM = 2500;
 
 const getWaveRadiusKm = (quakeTime: string, depth: number, speed: number, now: number) => {
@@ -25,6 +34,13 @@ const getWaveRadiusKm = (quakeTime: string, depth: number, speed: number, now: n
   const travelDistance = elapsedSeconds * speed;
   const surfaceDistance = Math.sqrt(Math.max(0, travelDistance ** 2 - Math.max(0, depth) ** 2));
   return Math.min(surfaceDistance, MAX_WAVE_RADIUS_KM);
+};
+
+const getTsunamiWaveRadiusKm = (originTime: string, now: number) => {
+  const ts = new Date(originTime.replace(/-/g, '/')).getTime();
+  if (!Number.isFinite(ts)) return 0;
+  const elapsed = Math.max(0, (now - ts) / 1000);
+  return Math.min(elapsed * TSUNAMI_SPEED_KM_PER_SEC, 4000);
 };
 
 const parseCoordinate = (value: string | number | undefined) => {
@@ -88,7 +104,7 @@ const useAnimationNow = (active: boolean) => {
   return now;
 };
 
-export const EarthquakeMap = ({ currentQuake, eew, tsunami, userLocation, onSetUserLocation, settingLocation }: Props) => {
+export const EarthquakeMap = ({ currentQuake, eew, tsunami, tsunamiSource, userLocation, onSetUserLocation, settingLocation }: Props) => {
   const [geoData, setGeoData] = useState<any>(null);
 
   const hasTsunamiInfo = !!tsunami && tsunami.areas.length > 0;
@@ -115,7 +131,8 @@ export const EarthquakeMap = ({ currentQuake, eew, tsunami, userLocation, onSetU
   const waveEpicenter =
     eewEpicenter && eewEpicenter.lat > 0 && eewEpicenter.lng > 0 ? eewEpicenter : null;
 
-  const now = useAnimationNow(!!waveEpicenter);
+  const animationActive = !!waveEpicenter || (!!tsunamiSource && tsunamiSource.lat > 0);
+  const now = useAnimationNow(animationActive);
 
   useEffect(() => {
     fetch('https://raw.githubusercontent.com/dataofjapan/land/master/japan.geojson')
@@ -195,6 +212,12 @@ export const EarthquakeMap = ({ currentQuake, eew, tsunami, userLocation, onSetU
     ? getWaveRadiusKm(waveEpicenter.time, waveEpicenter.depth, S_WAVE_SPEED_KM_PER_SEC, now) * 1000
     : 0;
 
+  const tsunamiWaveRadius = tsunamiSource && tsunamiSource.lat > 0
+    ? getTsunamiWaveRadiusKm(tsunamiSource.time, now) * 1000
+    : 0;
+
+  const tsunamiWaveColor = getTsunamiGradeColor(tsunamiSource?.grade || 'Watch');
+
   const geoKey = `${currentQuake?.id || 'default'}-${JSON.stringify(tsunamiPrefGrades)}`;
 
   return (
@@ -215,6 +238,53 @@ export const EarthquakeMap = ({ currentQuake, eew, tsunami, userLocation, onSetU
         <GeoJSON key={geoKey} data={geoData} style={getStyle} />
       )}
 
+      {/* Tsunami wave front simulation */}
+      {tsunamiSource && tsunamiSource.lat > 0 && tsunamiWaveRadius > 0 && !waveEpicenter && (
+        <>
+          {/* Filled area behind wave */}
+          <Circle
+            center={[tsunamiSource.lat, tsunamiSource.lng]}
+            radius={tsunamiWaveRadius}
+            pathOptions={{
+              color: tsunamiWaveColor,
+              fillColor: tsunamiWaveColor,
+              fillOpacity: 0.06,
+              opacity: 0,
+              weight: 0,
+            }}
+            interactive={false}
+          />
+          {/* Wave front ring */}
+          <Circle
+            center={[tsunamiSource.lat, tsunamiSource.lng]}
+            radius={tsunamiWaveRadius}
+            pathOptions={{
+              color: tsunamiWaveColor,
+              fillColor: 'transparent',
+              fillOpacity: 0,
+              opacity: 0.8,
+              weight: 3,
+              dashArray: '12 8',
+            }}
+            interactive={false}
+          />
+          {/* Inner glow ring slightly behind */}
+          <Circle
+            center={[tsunamiSource.lat, tsunamiSource.lng]}
+            radius={Math.max(0, tsunamiWaveRadius - 30000)}
+            pathOptions={{
+              color: tsunamiWaveColor,
+              fillColor: 'transparent',
+              fillOpacity: 0,
+              opacity: 0.3,
+              weight: 1.5,
+            }}
+            interactive={false}
+          />
+        </>
+      )}
+
+      {/* EEW P wave */}
       {waveEpicenter && pWaveRadius > 0 && (
         <Circle
           center={[waveEpicenter.lat, waveEpicenter.lng]}
@@ -231,6 +301,7 @@ export const EarthquakeMap = ({ currentQuake, eew, tsunami, userLocation, onSetU
         />
       )}
 
+      {/* EEW S wave */}
       {waveEpicenter && sWaveRadius > 0 && (
         <Circle
           center={[waveEpicenter.lat, waveEpicenter.lng]}
