@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Circle, GeoJSON, MapContainer, Marker, useMap, useMapEvents, ZoomControl } from 'react-leaflet';
 import L from 'leaflet';
 import { EEWData, EarthquakeHistoryItem, TsunamiInfo, getIntensityColor, getScaleText, getTsunamiGradeColor } from '../lib/utils-earthquake';
@@ -12,6 +12,12 @@ export type TsunamiSource = {
   grade: string;
 } | null;
 
+export type ShakeCircle = {
+  radius: number;
+  color: string;
+  label: string;
+};
+
 type Props = {
   currentQuake: EarthquakeHistoryItem | null;
   eew: EEWData | null;
@@ -20,6 +26,7 @@ type Props = {
   userLocation: UserLocation;
   onSetUserLocation: (loc: UserLocation) => void;
   settingLocation: boolean;
+  shakeCircles?: ShakeCircle[];
 };
 
 const P_WAVE_SPEED_KM_PER_SEC = 6.0;
@@ -104,7 +111,7 @@ const useAnimationNow = (active: boolean) => {
   return now;
 };
 
-export const EarthquakeMap = ({ currentQuake, eew, tsunami, tsunamiSource, userLocation, onSetUserLocation, settingLocation }: Props) => {
+export const EarthquakeMap = ({ currentQuake, eew, tsunami, tsunamiSource, userLocation, onSetUserLocation, settingLocation, shakeCircles }: Props) => {
   const [geoData, setGeoData] = useState<any>(null);
 
   const hasTsunamiInfo = !!tsunami && tsunami.areas.length > 0;
@@ -316,6 +323,23 @@ export const EarthquakeMap = ({ currentQuake, eew, tsunami, tsunamiSource, userL
           interactive={false}
         />
       )}
+
+      {/* Shake map concentric circles */}
+      {shakeCircles && shakeCircles.map((sc, i) => (
+        <Circle
+          key={`shake-${i}`}
+          center={[waveEpicenter?.lat || 37.5, waveEpicenter?.lng || 137.5]}
+          radius={sc.radius * 1000}
+          pathOptions={{
+            color: sc.color,
+            fillColor: sc.color,
+            fillOpacity: 0.05,
+            opacity: 0.6,
+            weight: 1.5,
+          }}
+          interactive={false}
+        />
+      ))}
 
       {currentQuake && currentQuake.earthquake.hypocenter.latitude > 0 && (
         <Marker
