@@ -56,16 +56,44 @@ const parseCoordinate = (value: string | number | undefined) => {
   return Number.isFinite(coordinate) ? coordinate : 0;
 };
 
-const AutoZoomToEpicenter = ({ quake }: { quake: EarthquakeHistoryItem | null }) => {
+const haversineKm = (lat1: number, lng1: number, lat2: number, lng2: number) => {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+};
+
+const estimateEEWScale = (distKm: number, magnitude: number): number | null => {
+  const baseMag = Math.max(0, magnitude - 4.0);
+  if (baseMag === 0) return null;
+  const maxDist = 60 + baseMag * 40;
+  if (distKm >= maxDist) return null;
+  const distFactor = 1 - distKm / maxDist;
+  return Math.max(10, Math.min(70, Math.round(10 + baseMag * 20 * distFactor)));
+};
+
+const AutoZoomToEpicenter = ({
+  quake,
+  eewLat,
+  eewLng,
+}: {
+  quake: EarthquakeHistoryItem | null;
+  eewLat?: number;
+  eewLng?: number;
+}) => {
   const map = useMap();
   useEffect(() => {
-    if (!quake || quake.earthquake.hypocenter.latitude <= 0) return;
-    map.flyTo(
-      [quake.earthquake.hypocenter.latitude, quake.earthquake.hypocenter.longitude],
-      Math.max(map.getZoom(), 7),
-      { duration: 1.2 }
-    );
-  }, [map, quake?.id]);
+    if (quake && quake.earthquake.hypocenter.latitude > 0) {
+      map.flyTo(
+        [quake.earthquake.hypocenter.latitude, quake.earthquake.hypocenter.longitude],
+        Math.max(map.getZoom(), 7),
+        { duration: 1.2 }
+      );
+    } else if (eewLat && eewLat > 0 && eewLng && eewLng > 0) {
+      map.flyTo([eewLat, eewLng], Math.max(map.getZoom(), 6), { duration: 1.0 });
+    }
+  }, [map, quake?.id, eewLat, eewLng]);
   return null;
 };
 
@@ -156,6 +184,7 @@ export const EarthquakeMap = ({ currentQuake, eew, tsunami, tsunamiSource, userL
 
   const getStyle = (feature: any) => {
     let fillColor = '#15151b';
+    let fillOpacity = 1;
     let borderColor = '#3a3a50';
     let borderWeight = 0.8;
     const featureText = JSON.stringify(feature.properties);
@@ -166,6 +195,25 @@ export const EarthquakeMap = ({ currentQuake, eew, tsunami, tsunamiSource, userL
         if (featureText.includes(prefName)) {
           fillColor = getIntensityColor(prefScales[pref]);
           break;
+        }
+      }
+    }
+
+    // EEW shake map: estimate intensity per prefecture from epicenter distance
+    if (!currentQuake && eew && !eew.isCancel && eewEpicenter && eewEpicenter.lat > 0) {
+      const mag = parseFloat((eew as any).Magunitude || eew.Magnitude || '0');
+      if (mag > 0) {
+        let coords = feature.geometry.coordinates[0];
+        if (feature.geometry.type === 'MultiPolygon') coords = coords[0];
+        let latSum = 0, lngSum = 0, pts = 0;
+        (coords as number[][]).forEach(pt => { lngSum += pt[0]; latSum += pt[1]; pts++; });
+        if (pts > 0) {
+          const distKm = haversineKm(latSum / pts, lngSum / pts, eewEpicenter.lat, eewEpicenter.lng);
+          const estimated = estimateEEWScale(distKm, mag);
+          if (estimated !== null) {
+            fillColor = getIntensityColor(estimated);
+            fillOpacity = 0.78;
+          }
         }
       }
     }
@@ -185,7 +233,7 @@ export const EarthquakeMap = ({ currentQuake, eew, tsunami, tsunamiSource, userL
       color: borderColor,
       weight: borderWeight,
       fillColor,
-      fillOpacity: 1,
+      fillOpacity,
       opacity: 1,
     };
   };
@@ -225,7 +273,7 @@ export const EarthquakeMap = ({ currentQuake, eew, tsunami, tsunamiSource, userL
 
   const tsunamiWaveColor = getTsunamiGradeColor(tsunamiSource?.grade || 'Watch');
 
-  const geoKey = `${currentQuake?.id || 'default'}-${JSON.stringify(tsunamiPrefGrades)}`;
+  const geoKey = `${currentQuake?.id || 'default'}-${JSON.stringify(tsunamiPrefGrades)}-eew${eew?.Serial || '0'}`;
 
   return (
     <MapContainer
@@ -237,7 +285,7 @@ export const EarthquakeMap = ({ currentQuake, eew, tsunami, tsunamiSource, userL
       style={{ width: '100vw', height: '100vh', position: 'absolute', top: 0, left: 0, zIndex: 1 }}
       className={settingLocation ? 'cursor-crosshair' : ''}
     >
-      <AutoZoomToEpicenter quake={currentQuake} />
+      <AutoZoomToEpicenter quake={currentQuake} eewLat={eewEpicenter?.lat} eewLng={eewEpicenter?.lng} />
       <ZoomControl position="bottomright" />
       <MapClickHandler settingLocation={settingLocation} onSetUserLocation={onSetUserLocation} />
 
@@ -344,6 +392,15 @@ export const EarthquakeMap = ({ currentQuake, eew, tsunami, tsunamiSource, userL
       {currentQuake && currentQuake.earthquake.hypocenter.latitude > 0 && (
         <Marker
           position={[currentQuake.earthquake.hypocenter.latitude, currentQuake.earthquake.hypocenter.longitude]}
+          icon={epicenterIcon}
+          interactive={false}
+        />
+      )}
+
+      {/* EEW epicenter (shown when no confirmed quake yet) */}
+      {eewEpicenter && eewEpicenter.lat > 0 && !currentQuake && (
+        <Marker
+          position={[eewEpicenter.lat, eewEpicenter.lng]}
           icon={epicenterIcon}
           interactive={false}
         />

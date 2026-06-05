@@ -517,7 +517,7 @@ function Home() {
           <div className={`rounded-xl overflow-hidden shadow-2xl flex-shrink-0 border border-white/10 transition-colors duration-300 pointer-events-auto
             ${isEEWMode ? (isWarning ? 'bg-[#d33c30]/10' : 'bg-[#d37e30]/10') : 'bg-[#202434]'}`}
           >
-            <div className="flex items-stretch text-base font-black">
+            <div className="flex items-stretch text-base font-bold">
               <div className={`flex-1 p-3 flex items-center justify-center text-white
                 ${isEEWMode
                   ? (isWarning ? 'eew-warning-header tracking-wider' : 'eew-forecast-header tracking-wider')
@@ -536,7 +536,7 @@ function Home() {
 
             <div className="p-4">
               <div className="mb-4 flex flex-col-reverse">
-                <div className="text-2xl font-black leading-tight">
+                <div className="text-2xl font-bold leading-tight">
                   {isEEWMode
                     ? (eew.Hypocenter?.length > 0 ? eew.Hypocenter : '震源調査中')
                     : selectedQuake?.earthquake.hypocenter.name}
@@ -558,8 +558,8 @@ function Home() {
               <div className="flex items-center justify-between p-3 rounded-lg mb-4 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.16)]"
                 style={{ backgroundColor: currentIntensityColor }}
               >
-                <div className="text-lg font-black leading-tight">
-                  {isEEWMode && <div className="text-sm">推定</div>}
+                <div className="text-lg font-bold leading-tight">
+                  {isEEWMode && <div className="text-sm font-normal">推定</div>}
                   最大震度
                 </div>
                 <div className="text-5xl font-sans font-black leading-none text-white">
@@ -569,7 +569,7 @@ function Home() {
                 </div>
               </div>
 
-              <div className="flex justify-between items-center mb-2 font-bold text-base">
+              <div className="flex justify-between items-center mb-2 font-semibold text-base">
                 <div>マグニチュード</div>
                 <div className="flex items-center gap-2">
                   <div className="text-3xl font-sans font-normal" style={{ color: currentMagColor }}>
@@ -584,7 +584,7 @@ function Home() {
                 </div>
               </div>
 
-              <div className="flex justify-between items-center mb-2 font-bold text-base">
+              <div className="flex justify-between items-center mb-2 font-semibold text-base">
                 <div>深さ</div>
                 <div className="flex items-center gap-2">
                   <div className="text-3xl font-sans font-normal flex items-baseline" style={{ color: currentDepthColor }}>
@@ -626,14 +626,14 @@ function Home() {
           {/* Tab bar */}
           <div className="flex border-b border-white/10 flex-shrink-0">
             <button
-              className={`flex-1 py-2 text-sm font-bold transition-colors cursor-pointer
+              className={`flex-1 py-2 text-sm font-semibold transition-colors cursor-pointer
                 ${bottomTab === 'history' ? 'text-white border-b-2 border-[#4cd0a7]' : 'text-[#a0a0a8] hover:text-white'}`}
               onClick={() => setBottomTab('history')}
             >
               地震履歴
             </button>
             <button
-              className={`flex-1 py-2 text-sm font-bold transition-colors cursor-pointer relative
+              className={`flex-1 py-2 text-sm font-semibold transition-colors cursor-pointer relative
                 ${bottomTab === 'points' ? 'text-white border-b-2 border-[#4cd0a7]' : 'text-[#a0a0a8] hover:text-white'}`}
               onClick={() => setBottomTab('points')}
             >
@@ -665,7 +665,7 @@ function Home() {
                       </div>
                       <div className="flex flex-col flex-grow overflow-hidden">
                         <div className="text-[0.65rem] text-[#a0a0a8]">{timeStr}</div>
-                        <div className="text-[0.85rem] font-bold whitespace-nowrap overflow-hidden text-ellipsis">
+                        <div className="text-[0.85rem] font-medium whitespace-nowrap overflow-hidden text-ellipsis">
                           {eq.earthquake.hypocenter.name}
                         </div>
                       </div>
@@ -700,7 +700,7 @@ function Home() {
                             {label}
                           </div>
                           <div className="flex flex-col overflow-hidden">
-                            <div className="text-[0.75rem] font-bold text-white/90 whitespace-nowrap overflow-hidden text-ellipsis">
+                            <div className="text-[0.85rem] font-medium text-white/90 whitespace-nowrap overflow-hidden text-ellipsis">
                               {pt.addr || pt.pref}
                             </div>
                             <div className="text-[0.65rem] text-white/40">{pt.pref}</div>
@@ -788,7 +788,7 @@ function Home() {
           {isTestMode ? '⏹ TEST終了' : 'TEST'}
         </button>
         <div className="bg-[#141419]/85 backdrop-blur-md px-4 py-2 rounded-full text-xs text-[#a0a0a8]">
-          {status} | Ver 1.7.0
+          {status} | Ver 1.8.0
         </div>
       </div>
     </div>
