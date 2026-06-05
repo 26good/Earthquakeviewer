@@ -9,6 +9,7 @@ import { useEarthquakes } from './hooks/use-earthquakes';
 import { useEEW } from './hooks/use-eew';
 import { useTsunami } from './hooks/use-tsunami';
 import { useNotifications } from './hooks/use-notifications';
+import { useTestMode, PHASE_LABELS, TEST_TOTAL_PHASES } from './hooks/use-test-mode';
 import { EarthquakeMap } from './components/Map';
 import type { TsunamiSource, ShakeCircle } from './components/Map';
 import {
@@ -18,6 +19,7 @@ import {
   getIntensityColor,
   getTsunamiGradeColor,
   getTsunamiGradeLabel,
+  type EEWData,
 } from './lib/utils-earthquake';
 
 const queryClient = new QueryClient();
@@ -184,9 +186,30 @@ function Home() {
     setShowLocationPanel(false);
   }, []);
 
-  const { history, selectedQuake, setSelectedQuake, lastUpdate } = useEarthquakes(isSoundEnabled);
-  const { eew, status } = useEEW(isSoundEnabled);
-  const { tsunami, lastTsunamiUpdate } = useTsunami(isSoundEnabled);
+  const { history, selectedQuake: liveSelectedQuake, setSelectedQuake, lastUpdate } = useEarthquakes(isSoundEnabled);
+  const { eew: liveEEW, status } = useEEW(isSoundEnabled);
+  const { tsunami: liveTsunami, lastTsunamiUpdate } = useTsunami(isSoundEnabled);
+
+  // ── Test mode ──────────────────────────────────────────────────────────
+  const { isTestMode, testEEW, testQuake, testTsunami, testPhase, toggle: toggleTest } = useTestMode();
+  const eew = isTestMode ? testEEW : liveEEW;
+  const selectedQuake = isTestMode ? testQuake : liveSelectedQuake;
+  const tsunami = isTestMode ? testTsunami : liveTsunami;
+  const isTestModeRef = useRef(false);
+  isTestModeRef.current = isTestMode;
+
+  // Shift+T → start / stop test replay
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.shiftKey && e.key.toLowerCase() === 't') {
+        e.preventDefault();
+        toggleTest(isSoundEnabled);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [toggleTest, isSoundEnabled]);
+  // ───────────────────────────────────────────────────────────────────────
 
   // ── Notification triggers ──────────────────────────────────────────────
   const lastNotifiedQuakeRef = useRef<string | null>(null);
@@ -194,6 +217,7 @@ function Home() {
   const lastNotifiedTsunamiRef = useRef<string | null>(null);
 
   useEffect(() => {
+    if (isTestModeRef.current) return;
     if (!selectedQuake) return;
     if (lastNotifiedQuakeRef.current === selectedQuake.id) return;
     lastNotifiedQuakeRef.current = selectedQuake.id;
@@ -205,6 +229,7 @@ function Home() {
   }, [selectedQuake?.id]);
 
   useEffect(() => {
+    if (isTestModeRef.current) return;
     if (!eew) return;
     const key = `${eew.Serial}`;
     if (lastNotifiedEEWRef.current === key) return;
@@ -217,6 +242,7 @@ function Home() {
   }, [eew?.Serial]);
 
   useEffect(() => {
+    if (isTestModeRef.current) return;
     if (!tsunami) return;
     if (lastNotifiedTsunamiRef.current === tsunami.id) return;
     lastNotifiedTsunamiRef.current = tsunami.id;
@@ -302,6 +328,29 @@ function Home() {
 
   return (
     <div className="relative w-full h-screen bg-black overflow-hidden font-sans text-white dark">
+
+      {/* ── Test mode banner ─────────────────────────────────────────────── */}
+      {isTestMode && (
+        <div className="absolute top-0 left-0 right-0 z-[200] flex items-center justify-between px-4 py-2 bg-red-700/95 backdrop-blur-sm border-b border-red-400/30">
+          <div className="flex items-center gap-3">
+            <span className="text-white font-black text-sm animate-pulse">🔴 REPLAY</span>
+            <span className="text-white/90 text-xs font-semibold">
+              {PHASE_LABELS[testPhase] || '準備中'}
+            </span>
+            <span className="text-white/50 text-xs">
+              ({testPhase}/{TEST_TOTAL_PHASES})
+            </span>
+          </div>
+          <button
+            className="text-white/80 text-xs font-bold hover:text-white cursor-pointer border border-white/30 rounded px-2 py-0.5 hover:bg-white/10"
+            onClick={() => toggleTest(isSoundEnabled)}
+          >
+            ✕ 終了
+          </button>
+        </div>
+      )}
+      {/* ─────────────────────────────────────────────────────────────────── */}
+
       <EarthquakeMap
         currentQuake={selectedQuake}
         eew={eew}
@@ -462,7 +511,7 @@ function Home() {
       )}
 
       {/* Left panel */}
-      <div className="ui-layer absolute top-5 left-5 w-[350px] h-[calc(100vh-40px)] z-50 flex flex-col gap-4 pointer-events-none">
+      <div className={`ui-layer absolute ${isTestMode ? 'top-14' : 'top-5'} left-5 w-[350px] h-[calc(100vh-40px)] z-50 flex flex-col gap-4 pointer-events-none`}>
 
         {displayData && (
           <div className={`rounded-xl overflow-hidden shadow-2xl flex-shrink-0 border border-white/10 transition-colors duration-300 pointer-events-auto
@@ -728,8 +777,19 @@ function Home() {
       )}
 
       {/* Status bar */}
-      <div className="status-bar absolute bottom-5 right-5 z-50 bg-[#141419]/85 backdrop-blur-md px-4 py-2 rounded-full text-xs text-[#a0a0a8]">
-        {status} | Ver 1.6.0
+      <div className="status-bar absolute bottom-5 right-5 z-50 flex items-center gap-2">
+        <button
+          onClick={() => toggleTest(isSoundEnabled)}
+          className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-all cursor-pointer backdrop-blur-md
+            ${isTestMode
+              ? 'text-red-300 border-red-400/60 bg-red-900/50 shadow-[0_0_10px_rgba(220,38,38,0.3)]'
+              : 'text-white/35 border-white/10 bg-[#141419]/85 hover:text-white/60'}`}
+        >
+          {isTestMode ? '⏹ TEST終了' : 'TEST'}
+        </button>
+        <div className="bg-[#141419]/85 backdrop-blur-md px-4 py-2 rounded-full text-xs text-[#a0a0a8]">
+          {status} | Ver 1.7.0
+        </div>
       </div>
     </div>
   );
