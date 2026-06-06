@@ -256,6 +256,55 @@ function Home() {
   }, [tsunami?.id]);
   // ────────────────────────────────────────────────────────────────────────
 
+  // ── Dynamic tab title ──────────────────────────────────────────────────
+  const newQuakeTimeRef = useRef<number>(0);
+  const lastTitleQuakeIdRef = useRef<string | null>(null);
+  const eewForTitleRef = useRef(eew);
+  eewForTitleRef.current = eew;
+  const historyForTitleRef = useRef(history);
+  historyForTitleRef.current = history;
+
+  // Track when a new earthquake first appears in history
+  useEffect(() => {
+    const latest = history[0];
+    if (!latest || lastTitleQuakeIdRef.current === latest.id) return;
+    lastTitleQuakeIdRef.current = latest.id;
+    newQuakeTimeRef.current = Date.now();
+  }, [history[0]?.id]);
+
+  // Blink the tab title based on current state
+  useEffect(() => {
+    const BASE = '地震監視モニター';
+    let blink = false;
+    const tick = () => {
+      blink = !blink;
+      const ev = eewForTitleRef.current;
+      const hist = historyForTitleRef.current;
+      const ageSec = (Date.now() - newQuakeTimeRef.current) / 1000;
+      if (ev && !ev.isCancel) {
+        const isWarn = ev.Title?.includes('警報');
+        const place = ev.Hypocenter || '震源調査中';
+        const scale = ev.MaxInt || '?';
+        document.title = blink
+          ? `${isWarn ? '⚠' : '🔔'} ${place} 震度${scale} | 緊急地震速報`
+          : `緊急地震速報 | ${BASE}`;
+      } else if (ageSec < 60 && hist[0]) {
+        const eq = hist[0];
+        const place = eq.earthquake.hypocenter.name;
+        const scale = getScaleText(eq.earthquake.maxScale);
+        document.title = blink
+          ? `【新着】震度${scale} ${place} | ${BASE}`
+          : `${BASE}`;
+      } else {
+        document.title = BASE;
+      }
+    };
+    const id = setInterval(tick, 900);
+    tick();
+    return () => { clearInterval(id); document.title = '地震監視モニター'; };
+  }, []);
+  // ────────────────────────────────────────────────────────────────────────
+
   const displayData = eew || selectedQuake;
   const isEEWMode = !!eew;
   const isWarning = eew?.Title?.includes('警報');
