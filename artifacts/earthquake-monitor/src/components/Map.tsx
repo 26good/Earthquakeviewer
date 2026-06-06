@@ -12,12 +12,6 @@ export type TsunamiSource = {
   grade: string;
 } | null;
 
-export type ShakeCircle = {
-  radius: number;
-  color: string;
-  label: string;
-};
-
 type Props = {
   currentQuake: EarthquakeHistoryItem | null;
   eew: EEWData | null;
@@ -26,7 +20,6 @@ type Props = {
   userLocation: UserLocation;
   onSetUserLocation: (loc: UserLocation) => void;
   settingLocation: boolean;
-  shakeCircles?: ShakeCircle[];
 };
 
 const P_WAVE_SPEED_KM_PER_SEC = 6.0;
@@ -139,7 +132,7 @@ const useAnimationNow = (active: boolean) => {
   return now;
 };
 
-export const EarthquakeMap = ({ currentQuake, eew, tsunami, tsunamiSource, userLocation, onSetUserLocation, settingLocation, shakeCircles }: Props) => {
+export const EarthquakeMap = ({ currentQuake, eew, tsunami, tsunamiSource, userLocation, onSetUserLocation, settingLocation }: Props) => {
   const [geoData, setGeoData] = useState<any>(null);
 
   const hasTsunamiInfo = !!tsunami && tsunami.areas.length > 0;
@@ -166,7 +159,7 @@ export const EarthquakeMap = ({ currentQuake, eew, tsunami, tsunamiSource, userL
   const waveEpicenter =
     eewEpicenter && eewEpicenter.lat > 0 && eewEpicenter.lng > 0 ? eewEpicenter : null;
 
-  const animationActive = !!waveEpicenter || (!!tsunamiSource && tsunamiSource.lat > 0);
+  const animationActive = !!waveEpicenter;
   const now = useAnimationNow(animationActive);
 
   useEffect(() => {
@@ -203,10 +196,16 @@ export const EarthquakeMap = ({ currentQuake, eew, tsunami, tsunamiSource, userL
     if (!currentQuake && eew && !eew.isCancel && eewEpicenter && eewEpicenter.lat > 0) {
       const mag = parseFloat((eew as any).Magunitude || eew.Magnitude || '0');
       if (mag > 0) {
-        let coords = feature.geometry.coordinates[0];
-        if (feature.geometry.type === 'MultiPolygon') coords = coords[0];
+        // Use the largest polygon ring to avoid computing distances to small islands
+        let coords: number[][] = feature.geometry.coordinates[0];
+        if (feature.geometry.type === 'MultiPolygon') {
+          let maxLen = 0;
+          for (const poly of feature.geometry.coordinates as number[][][][]) {
+            if (poly[0].length > maxLen) { maxLen = poly[0].length; coords = poly[0]; }
+          }
+        }
         let latSum = 0, lngSum = 0, pts = 0;
-        (coords as number[][]).forEach(pt => { lngSum += pt[0]; latSum += pt[1]; pts++; });
+        coords.forEach(pt => { lngSum += pt[0]; latSum += pt[1]; pts++; });
         if (pts > 0) {
           const distKm = haversineKm(latSum / pts, lngSum / pts, eewEpicenter.lat, eewEpicenter.lng);
           const estimated = estimateEEWScale(distKm, mag);
@@ -293,52 +292,6 @@ export const EarthquakeMap = ({ currentQuake, eew, tsunami, tsunamiSource, userL
         <GeoJSON key={geoKey} data={geoData} style={getStyle} />
       )}
 
-      {/* Tsunami wave front simulation */}
-      {tsunamiSource && tsunamiSource.lat > 0 && tsunamiWaveRadius > 0 && !waveEpicenter && (
-        <>
-          {/* Filled area behind wave */}
-          <Circle
-            center={[tsunamiSource.lat, tsunamiSource.lng]}
-            radius={tsunamiWaveRadius}
-            pathOptions={{
-              color: tsunamiWaveColor,
-              fillColor: tsunamiWaveColor,
-              fillOpacity: 0.06,
-              opacity: 0,
-              weight: 0,
-            }}
-            interactive={false}
-          />
-          {/* Wave front ring */}
-          <Circle
-            center={[tsunamiSource.lat, tsunamiSource.lng]}
-            radius={tsunamiWaveRadius}
-            pathOptions={{
-              color: tsunamiWaveColor,
-              fillColor: 'transparent',
-              fillOpacity: 0,
-              opacity: 0.8,
-              weight: 3,
-              dashArray: '12 8',
-            }}
-            interactive={false}
-          />
-          {/* Inner glow ring slightly behind */}
-          <Circle
-            center={[tsunamiSource.lat, tsunamiSource.lng]}
-            radius={Math.max(0, tsunamiWaveRadius - 30000)}
-            pathOptions={{
-              color: tsunamiWaveColor,
-              fillColor: 'transparent',
-              fillOpacity: 0,
-              opacity: 0.3,
-              weight: 1.5,
-            }}
-            interactive={false}
-          />
-        </>
-      )}
-
       {/* EEW P wave */}
       {waveEpicenter && pWaveRadius > 0 && (
         <Circle
@@ -371,23 +324,6 @@ export const EarthquakeMap = ({ currentQuake, eew, tsunami, tsunamiSource, userL
           interactive={false}
         />
       )}
-
-      {/* Shake map concentric circles */}
-      {shakeCircles && shakeCircles.map((sc, i) => (
-        <Circle
-          key={`shake-${i}`}
-          center={[waveEpicenter?.lat || 37.5, waveEpicenter?.lng || 137.5]}
-          radius={sc.radius * 1000}
-          pathOptions={{
-            color: sc.color,
-            fillColor: sc.color,
-            fillOpacity: 0.05,
-            opacity: 0.6,
-            weight: 1.5,
-          }}
-          interactive={false}
-        />
-      ))}
 
       {currentQuake && currentQuake.earthquake.hypocenter.latitude > 0 && (
         <Marker
@@ -425,8 +361,14 @@ export const EarthquakeMap = ({ currentQuake, eew, tsunami, tsunamiSource, userL
         }
         if (!matchedPref) return null;
 
-        let coords = feature.geometry.coordinates[0];
-        if (feature.geometry.type === 'MultiPolygon') coords = coords[0];
+        // Use the largest polygon ring (most points) to avoid placing icons on small islands
+        let coords: number[][] = feature.geometry.coordinates[0];
+        if (feature.geometry.type === 'MultiPolygon') {
+          let maxLen = 0;
+          for (const poly of feature.geometry.coordinates as number[][][][]) {
+            if (poly[0].length > maxLen) { maxLen = poly[0].length; coords = poly[0]; }
+          }
+        }
         let latSum = 0, lngSum = 0, pts = 0;
         coords.forEach((pt: number[]) => { lngSum += pt[0]; latSum += pt[1]; pts++; });
 

@@ -11,7 +11,7 @@ import { useTsunami } from './hooks/use-tsunami';
 import { useNotifications } from './hooks/use-notifications';
 import { useTestMode, PHASE_LABELS, TEST_TOTAL_PHASES } from './hooks/use-test-mode';
 import { EarthquakeMap } from './components/Map';
-import type { TsunamiSource, ShakeCircle } from './components/Map';
+import type { TsunamiSource } from './components/Map';
 import {
   getScaleText,
   getMagColor,
@@ -35,45 +35,6 @@ const formatClockTime = () =>
 const P_WAVE_SPEED = 6.0;
 const S_WAVE_SPEED = 3.5;
 
-// Shake map: estimate intensity from distance using a simplified attenuation model
-// Mag ~6 => scale 50 at 0km, scale 20 at ~100km, scale 10 at ~200km
-const estimateScaleFromDistance = (distKm: number, magnitude: number) => {
-  const baseMag = Math.max(0, magnitude - 4.0);
-  const distFactor = Math.max(0, 1 - distKm / (60 + baseMag * 40));
-  const scale = Math.round(10 + baseMag * 20 * distFactor);
-  return Math.max(10, Math.min(70, scale));
-};
-
-const SHAKE_MAP_BANDS = [10, 20, 30, 40, 45, 50, 55, 60, 70];
-const getShakeMapCircles = (eew: EEWData | null): ShakeCircle[] => {
-  if (!eew) return [];
-  const lat = parseFloat(eew.Latitude as any || eew.latitude as any || '0');
-  const lng = parseFloat(eew.Longitude as any || eew.longitude as any || '0');
-  const mag = parseFloat(eew.Magunitude || eew.Magnitude || '0');
-  if (lat === 0 || lng === 0 || mag <= 0) return [];
-
-  const circles: ShakeCircle[] = [];
-  for (let i = 0; i < SHAKE_MAP_BANDS.length - 1; i++) {
-    const scaleUpper = SHAKE_MAP_BANDS[i + 1];
-    const scaleLower = SHAKE_MAP_BANDS[i];
-    // Find the distance band where scale is in [scaleLower, scaleUpper)
-    let distLower = 0;
-    let distUpper = 300;
-    for (let d = 0; d <= 300; d += 5) {
-      const est = estimateScaleFromDistance(d, mag);
-      if (est < scaleLower && distLower === 0) distLower = d;
-      if (est < scaleUpper && distUpper === 300) distUpper = d;
-    }
-    if (distLower >= 0 && distUpper > distLower) {
-      circles.push({
-        radius: distUpper,
-        color: getIntensityColor(scaleLower),
-        label: getScaleText(scaleLower),
-      });
-    }
-  }
-  return circles.reverse(); // outer first
-};
 
 const haversineKm = (lat1: number, lng1: number, lat2: number, lng2: number) => {
   const R = 6371;
@@ -263,6 +224,8 @@ function Home() {
   eewForTitleRef.current = eew;
   const historyForTitleRef = useRef(history);
   historyForTitleRef.current = history;
+  const tsunamiForTitleRef = useRef(tsunami);
+  tsunamiForTitleRef.current = tsunami;
 
   // Track when a new earthquake first appears in history
   useEffect(() => {
@@ -296,7 +259,14 @@ function Home() {
           ? `【新着】震度${scale} ${place} | ${BASE}`
           : `${BASE}`;
       } else {
-        document.title = BASE;
+        const ts = tsunamiForTitleRef.current;
+        if (ts && ts.areas.length > 0 && !ts.cancelled) {
+          const lvl = ts.areas.some(a => a.grade === 'MajorWarning') ? '大津波警報'
+            : ts.areas.some(a => a.grade === 'Warning') ? '津波警報' : '津波注意報';
+          document.title = blink ? `🌊 ${lvl} 発表中 | ${BASE}` : `${BASE}`;
+        } else {
+          document.title = BASE;
+        }
       }
     };
     const id = setInterval(tick, 900);
@@ -372,9 +342,6 @@ function Home() {
     ? [...selectedQuake.points].sort((a, b) => b.scale - a.scale)
     : [];
 
-  // Shake map concentric circles for EEW
-  const shakeCircles = getShakeMapCircles(eew);
-
   return (
     <div className="relative w-full h-screen bg-black overflow-hidden font-sans text-white dark">
 
@@ -408,7 +375,6 @@ function Home() {
         userLocation={userLocation}
         onSetUserLocation={handleSetUserLocation}
         settingLocation={settingLocation}
-        shakeCircles={shakeCircles}
       />
 
       {/* Top-right button row */}
@@ -521,41 +487,6 @@ function Home() {
             <div className="mt-2 text-white/35 text-[11px]">📍 位置を設定すると到達時刻を表示</div>
           )}
 
-          {/* Shake map legend */}
-          {shakeCircles.length > 0 && (
-            <div className="mt-3 border-t border-white/10 pt-2">
-              <div className="text-white/70 mb-1 font-semibold text-[11px]">🌊 推定震度分布（シェイクマップ）</div>
-              <div className="flex flex-wrap gap-1">
-                {shakeCircles.map((sc, i) => (
-                  <span
-                    key={i}
-                    className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-bold"
-                    style={{ backgroundColor: `${sc.color}33`, color: sc.color }}
-                  >
-                    <span className="w-2 h-2 rounded-full" style={{ backgroundColor: sc.color }}></span>
-                    {sc.label} ≤ {sc.radius} km
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Tsunami simulation legend */}
-      {tsunamiSource && !isEEWMode && (
-        <div className="absolute top-20 right-5 z-50 rounded-2xl border bg-[#141419]/85 px-4 py-3 text-xs text-white/80 backdrop-blur-md shadow-2xl min-w-[185px]"
-          style={{ borderColor: `${getTsunamiGradeColor(tsunamiSource.grade)}44` }}
-        >
-          <div className="mb-2 font-bold" style={{ color: getTsunamiGradeColor(tsunamiSource.grade) }}>
-            🌊 津波伝播シミュレーション
-          </div>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="h-2 w-8 rounded-full border shrink-0" style={{ borderColor: getTsunamiGradeColor(tsunamiSource.grade) }}></span>
-            <span>津波波面（推定）</span>
-          </div>
-          <div className="text-white/40 text-[11px] mt-1">速度 約 720 km/h（外洋）</div>
-          <div className="text-white/35 text-[11px]">※ 海底地形により実際の到達は異なります</div>
         </div>
       )}
 
@@ -664,7 +595,11 @@ function Home() {
                   ? (isWarning
                       ? '緊急地震速報（警報）発表\n強い揺れに警戒してください'
                       : '緊急地震速報（予報）発表\n今後の情報に注意してください')
-                  : (tsunamiLevel ? `${getTsunamiGradeLabel(tsunamiLevel)} 発表中` : '津波の心配なし')}
+                  : tsunamiLevel
+                    ? `${getTsunamiGradeLabel(tsunamiLevel)} 発表中`
+                    : selectedQuake && !['None', 'NonEffective'].includes(selectedQuake.earthquake.domesticTsunami ?? 'None')
+                      ? '津波情報 調査中'
+                      : '津波の心配なし'}
               </div>
             </div>
           </div>
@@ -837,7 +772,7 @@ function Home() {
           {isTestMode ? '⏹ TEST終了' : 'TEST'}
         </button>
         <div className="bg-[#141419]/85 backdrop-blur-md px-4 py-2 rounded-full text-xs text-[#a0a0a8]">
-          {status} | Ver 1.8.0
+          {status} | Ver 1.9.0
         </div>
       </div>
     </div>
