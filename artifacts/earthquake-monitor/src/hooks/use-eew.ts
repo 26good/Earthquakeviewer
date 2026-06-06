@@ -73,7 +73,9 @@ export const useEEW = (isSoundEnabled: boolean) => {
           const isNew = !prevEEW || prevEEW.Serial !== data.Serial;
 
           if (isSoundEnabled && isNew) {
-            if (data.Title?.includes('警報')) {
+            const isWarnByTitle = data.Title?.includes('警報');
+            const isWarnByScale = /[567]/.test(data.MaxInt || '');
+            if (isWarnByTitle || isWarnByScale) {
               playSound.alert();
             } else if (data.isFinal) {
               playSound.end();

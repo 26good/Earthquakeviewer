@@ -277,7 +277,11 @@ function Home() {
 
   const displayData = eew || selectedQuake;
   const isEEWMode = !!eew;
-  const isWarning = eew?.Title?.includes('警報');
+  // 警報判定: APIのTitleに「警報」が含まれる、または推定最大震度が5弱以上
+  const isWarning = !!eew && (
+    !!eew.Title?.includes('警報') ||
+    /[567]/.test(eew.MaxInt || '')
+  );
 
   const tsunamiLevel =
     tsunami?.areas.some(a => a.grade === 'MajorWarning') ? 'MajorWarning' :
