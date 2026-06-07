@@ -233,7 +233,22 @@ function Home() {
     if (!latest || lastTitleQuakeIdRef.current === latest.id) return;
     lastTitleQuakeIdRef.current = latest.id;
     newQuakeTimeRef.current = Date.now();
+    // If the tab is already visible, auto-clear the blinking after 10 s
+    const t = !document.hidden ? setTimeout(() => { newQuakeTimeRef.current = 0; }, 10000) : null;
+    return () => { if (t) clearTimeout(t); };
   }, [history[0]?.id]);
+
+  // Clear "新着" blinking as soon as the user switches back to this tab
+  useEffect(() => {
+    const clearBlink = () => { newQuakeTimeRef.current = 0; };
+    const onVisChange = () => { if (!document.hidden) clearBlink(); };
+    window.addEventListener('focus', clearBlink);
+    document.addEventListener('visibilitychange', onVisChange);
+    return () => {
+      window.removeEventListener('focus', clearBlink);
+      document.removeEventListener('visibilitychange', onVisChange);
+    };
+  }, []);
 
   // Blink the tab title based on current state
   useEffect(() => {
