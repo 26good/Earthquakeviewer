@@ -19,6 +19,7 @@ import {
   getIntensityColor,
   getTsunamiGradeColor,
   getTsunamiGradeLabel,
+  computeMaxIntensity,
   type EEWData,
 } from './lib/utils-earthquake';
 
@@ -262,7 +263,9 @@ function Home() {
       if (ev && !ev.isCancel) {
         const isWarn = ev.Title?.includes('警報');
         const place = ev.Hypocenter || '震源調査中';
-        const scale = ev.MaxInt || '?';
+        const evMag = parseFloat(ev.Magunitude || ev.Magnitude || '0');
+        const evDepth = parseInt(ev.Depth || '0') || 5;
+        const scale = ev.MaxInt?.trim() || computeMaxIntensity(evMag, evDepth);
         document.title = blink
           ? `${isWarn ? '⚠' : '🔔'} ${place} 震度${scale} | 緊急地震速報`
           : `緊急地震速報 | ${BASE}`;
@@ -292,11 +295,6 @@ function Home() {
 
   const displayData = eew || selectedQuake;
   const isEEWMode = !!eew;
-  // 警報判定: APIのTitleに「警報」が含まれる、または推定最大震度が5弱以上
-  const isWarning = !!eew && (
-    !!eew.Title?.includes('警報') ||
-    /[567]/.test(eew.MaxInt || '')
-  );
 
   const tsunamiLevel =
     tsunami?.areas.some(a => a.grade === 'MajorWarning') ? 'MajorWarning' :
@@ -320,8 +318,21 @@ function Home() {
   const currentDepth = isEEWMode
     ? parseInt(eew.Depth || '0')
     : selectedQuake?.earthquake.hypocenter.depth || 0;
+
+  // When the EEW API MaxInt is empty, fall back to intensity computed from M and depth
+  const eewApiMaxInt = isEEWMode ? (eew.MaxInt?.trim() ?? '') : '';
+  const eewComputedMaxInt = isEEWMode ? computeMaxIntensity(currentMagnitude, currentDepth) : '';
+  const eewDisplayMaxInt = eewApiMaxInt || eewComputedMaxInt;
+  const eewIntIsComputed = isEEWMode && !eewApiMaxInt && !!eewComputedMaxInt;
+
+  // 警報判定: APIのTitleに「警報」が含まれる、または表示最大震度（API値 or 計算値）が5弱以上
+  const isWarning = !!eew && (
+    !!eew.Title?.includes('警報') ||
+    /[567]/.test(eewDisplayMaxInt)
+  );
+
   const currentIntensityColor = getIntensityColor(
-    isEEWMode ? eew.MaxInt : selectedQuake?.earthquake.maxScale
+    isEEWMode ? eewDisplayMaxInt : selectedQuake?.earthquake.maxScale
   );
   const currentMagColor = getMagColor(currentMagnitude);
   const currentDepthColor = getDepthColor(currentDepth);
@@ -558,12 +569,16 @@ function Home() {
                 style={{ backgroundColor: currentIntensityColor }}
               >
                 <div className="text-lg font-bold leading-tight">
-                  {isEEWMode && <div className="text-sm font-normal">推定</div>}
+                  {isEEWMode && (
+                    <div className="text-sm font-normal">
+                      {eewIntIsComputed ? 'M・深さから計算' : '推定'}
+                    </div>
+                  )}
                   最大震度
                 </div>
                 <div className="text-5xl font-sans font-black leading-none text-white">
                   {isEEWMode
-                    ? (eew.MaxInt?.length > 0 ? eew.MaxInt.replace('弱', '-').replace('強', '+') : '?')
+                    ? (eewDisplayMaxInt ? eewDisplayMaxInt.replace('弱', '-').replace('強', '+') : '?')
                     : (selectedQuake ? getScaleText(selectedQuake.earthquake.maxScale) : '-')}
                 </div>
               </div>

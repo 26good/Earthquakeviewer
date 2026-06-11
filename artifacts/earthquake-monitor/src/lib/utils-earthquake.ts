@@ -132,6 +132,28 @@ export const getTsunamiGradeLabel = (grade: TsunamiGrade) => {
   return '津波情報';
 };
 
+/**
+ * Estimate the maximum seismic intensity at the surface point directly above
+ * the hypocenter from magnitude and focal depth.
+ * Uses the empirical formula: I = 2.606 + 1.498·M − 1.657·log10(depth)
+ * (depth floored at 5 km to avoid singularity near surface).
+ */
+export const computeMaxIntensity = (mag: number, depthKm: number): string => {
+  if (!Number.isFinite(mag) || mag <= 0) return '?';
+  const d = Math.max(depthKm, 5);
+  const I = 2.606 + 1.498 * mag - 1.657 * Math.log10(d);
+  if (I < 0.5) return '0';
+  if (I < 1.5) return '1';
+  if (I < 2.5) return '2';
+  if (I < 3.5) return '3';
+  if (I < 4.5) return '4';
+  if (I < 5.0) return '5弱';
+  if (I < 5.5) return '5強';
+  if (I < 6.0) return '6弱';
+  if (I < 6.5) return '6強';
+  return '7';
+};
+
 export const getTsunamiGradeColor = (grade: TsunamiGrade) => {
   if (grade === 'MajorWarning') return '#8b5cf6';
   if (grade === 'Warning') return '#ef4444';
