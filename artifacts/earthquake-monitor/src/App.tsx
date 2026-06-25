@@ -54,6 +54,57 @@ const parseCoordinate = (value: string | number | undefined): number => {
   return Number.isFinite(n) ? n : 0;
 };
 
+// Prefecture center coordinates for nearest-prefecture lookup
+const PREF_CENTERS = [
+  { name: '北海道', lat: 43.06, lng: 142.96 },
+  { name: '青森県', lat: 40.82, lng: 140.74 },
+  { name: '岩手県', lat: 39.70, lng: 141.15 },
+  { name: '宮城県', lat: 38.27, lng: 140.87 },
+  { name: '秋田県', lat: 39.72, lng: 140.10 },
+  { name: '山形県', lat: 38.24, lng: 140.36 },
+  { name: '福島県', lat: 37.75, lng: 140.47 },
+  { name: '茨城県', lat: 36.34, lng: 140.45 },
+  { name: '栃木県', lat: 36.57, lng: 139.88 },
+  { name: '群馬県', lat: 36.39, lng: 139.06 },
+  { name: '埼玉県', lat: 35.86, lng: 139.65 },
+  { name: '千葉県', lat: 35.61, lng: 140.12 },
+  { name: '東京都', lat: 35.69, lng: 139.69 },
+  { name: '神奈川県', lat: 35.45, lng: 139.64 },
+  { name: '新潟県', lat: 37.90, lng: 139.02 },
+  { name: '富山県', lat: 36.70, lng: 137.21 },
+  { name: '石川県', lat: 36.59, lng: 136.63 },
+  { name: '福井県', lat: 36.07, lng: 136.22 },
+  { name: '山梨県', lat: 35.66, lng: 138.57 },
+  { name: '長野県', lat: 36.65, lng: 138.18 },
+  { name: '岐阜県', lat: 35.39, lng: 136.72 },
+  { name: '静岡県', lat: 34.98, lng: 138.38 },
+  { name: '愛知県', lat: 35.18, lng: 136.91 },
+  { name: '三重県', lat: 34.73, lng: 136.51 },
+  { name: '滋賀県', lat: 35.00, lng: 135.87 },
+  { name: '京都府', lat: 35.02, lng: 135.76 },
+  { name: '大阪府', lat: 34.69, lng: 135.50 },
+  { name: '兵庫県', lat: 34.69, lng: 135.18 },
+  { name: '奈良県', lat: 34.68, lng: 135.83 },
+  { name: '和歌山県', lat: 34.23, lng: 135.17 },
+  { name: '鳥取県', lat: 35.50, lng: 133.81 },
+  { name: '島根県', lat: 35.47, lng: 133.05 },
+  { name: '岡山県', lat: 34.66, lng: 133.93 },
+  { name: '広島県', lat: 34.40, lng: 132.46 },
+  { name: '山口県', lat: 34.19, lng: 131.47 },
+  { name: '徳島県', lat: 34.07, lng: 134.56 },
+  { name: '香川県', lat: 34.34, lng: 134.04 },
+  { name: '愛媛県', lat: 33.84, lng: 132.77 },
+  { name: '高知県', lat: 33.56, lng: 133.53 },
+  { name: '福岡県', lat: 33.61, lng: 130.42 },
+  { name: '佐賀県', lat: 33.25, lng: 130.30 },
+  { name: '長崎県', lat: 32.74, lng: 129.87 },
+  { name: '熊本県', lat: 32.79, lng: 130.74 },
+  { name: '大分県', lat: 33.24, lng: 131.61 },
+  { name: '宮崎県', lat: 31.91, lng: 131.42 },
+  { name: '鹿児島県', lat: 31.56, lng: 130.56 },
+  { name: '沖縄県', lat: 26.21, lng: 127.68 },
+] as const;
+
 const CITY_PRESETS = [
   { label: '札幌', lat: 43.0618, lng: 141.3545 },
   { label: '仙台', lat: 38.2688, lng: 140.8721 },
@@ -93,7 +144,9 @@ function Home() {
   const [settingLocation, setSettingLocation] = useState(false);
   const [showLocationPanel, setShowLocationPanel] = useState(false);
   const [bottomTab, setBottomTab] = useState<'history' | 'points'>('history');
+  const [showUpdatePanel, setShowUpdatePanel] = useState(false);
   const locationPanelRef = useRef<HTMLDivElement>(null);
+  const updatePanelRef = useRef<HTMLDivElement>(null);
 
   const { isEnabled: notifEnabled, permission: notifPermission, toggle: toggleNotif, notify } = useNotifications();
   const notifyRef = useRef(notify);
@@ -121,6 +174,9 @@ function Home() {
     const handler = (e: MouseEvent) => {
       if (locationPanelRef.current && !locationPanelRef.current.contains(e.target as Node)) {
         if (!settingLocation) setShowLocationPanel(false);
+      }
+      if (updatePanelRef.current && !updatePanelRef.current.contains(e.target as Node)) {
+        setShowUpdatePanel(false);
       }
     };
     document.addEventListener('mousedown', handler);
@@ -372,6 +428,23 @@ function Home() {
     ? [...selectedQuake.points].sort((a, b) => b.scale - a.scale)
     : [];
 
+  // Find nearest prefecture to user location, then get intensity observed there
+  const nearestPrefResult: { prefName: string; maxScale: number; points: typeof sortedPoints } | null =
+    userLocation && selectedQuake && selectedQuake.points.length > 0
+      ? (() => {
+          let minDist = Infinity;
+          let nearestPref = '';
+          for (const p of PREF_CENTERS) {
+            const d = haversineKm(userLocation.lat, userLocation.lng, p.lat, p.lng);
+            if (d < minDist) { minDist = d; nearestPref = p.name; }
+          }
+          const prefPoints = selectedQuake.points.filter(pt => pt.pref === nearestPref);
+          if (prefPoints.length === 0) return null;
+          const maxScale = Math.max(...prefPoints.map(pt => pt.scale));
+          return { prefName: nearestPref, maxScale, points: prefPoints };
+        })()
+      : null;
+
   return (
     <div className="relative w-full h-screen bg-black overflow-hidden font-sans text-white dark">
 
@@ -616,6 +689,36 @@ function Home() {
                 </div>
               </div>
 
+              {/* Nearest prefecture intensity for user location (non-EEW only) */}
+              {!isEEWMode && nearestPrefResult && (
+                <div className="mt-3 flex items-center justify-between rounded-lg px-3 py-2 bg-white/5 border border-white/10">
+                  <div className="text-sm text-white/70">
+                    <div className="text-[11px] text-white/40 mb-0.5">現在地付近 ({nearestPrefResult.prefName})</div>
+                    <div className="font-semibold">最寄りの震度</div>
+                  </div>
+                  <div
+                    className="text-3xl font-black font-sans px-3 py-1 rounded-lg"
+                    style={{ color: '#fff', backgroundColor: getIntensityColor(nearestPrefResult.maxScale) }}
+                  >
+                    {SCALE_LABELS[nearestPrefResult.maxScale] ?? '?'}
+                  </div>
+                </div>
+              )}
+              {!isEEWMode && userLocation && selectedQuake && !nearestPrefResult && (
+                <div className="mt-3 text-center text-xs text-white/30 py-1">
+                  現在地付近 ({
+                    (() => {
+                      let minDist = Infinity; let name = '';
+                      for (const p of PREF_CENTERS) {
+                        const d = haversineKm(userLocation.lat, userLocation.lng, p.lat, p.lng);
+                        if (d < minDist) { minDist = d; name = p.name; }
+                      }
+                      return name;
+                    })()
+                  }) の観測なし
+                </div>
+              )}
+
               <div
                 className={`mt-4 font-bold text-[0.95rem] leading-snug rounded-lg p-3 text-center
                   ${isEEWMode ? 'text-[#f4d03f] text-left bg-transparent !p-0' : ''}`}
@@ -734,10 +837,41 @@ function Home() {
         </div>
       </div>
 
-      {/* Clock */}
-      <div className="current-time-panel absolute top-5 left-[390px] z-50 rounded-xl border border-white/10 bg-[#141419]/85 px-4 py-3 text-white backdrop-blur-md shadow-2xl">
-        <div className="text-sm font-bold text-white">現在時刻</div>
-        <div className="text-sm text-white">{currentTime}</div>
+      {/* Clock + update status */}
+      <div ref={updatePanelRef} className="current-time-panel absolute top-5 left-[390px] z-50 flex items-center gap-2">
+        <div className="rounded-xl border border-white/10 bg-[#141419]/85 px-4 py-3 text-white backdrop-blur-md shadow-2xl">
+          <div className="text-sm font-bold text-white">現在時刻</div>
+          <div className="text-sm text-white">{currentTime}</div>
+        </div>
+        <div className="relative">
+          <button
+            onClick={() => setShowUpdatePanel(v => !v)}
+            className="rounded-xl border border-white/10 bg-[#141419]/85 px-3 py-3 text-white backdrop-blur-md shadow-2xl hover:bg-white/10 transition-colors cursor-pointer"
+            title="最終更新状況"
+          >
+            <div className="text-[10px] text-white/50 leading-tight">最終</div>
+            <div className="text-[10px] text-white/50 leading-tight">更新</div>
+          </button>
+          {showUpdatePanel && (
+            <div className="absolute top-full left-0 mt-2 w-56 rounded-xl border border-white/15 bg-[#141419]/95 p-3 shadow-2xl backdrop-blur-md text-xs space-y-2">
+              <div className="text-white/50 font-bold mb-1">最終更新状況</div>
+              <div className="flex justify-between items-center">
+                <span className="text-white/70">地震情報</span>
+                <span className="text-white font-mono">{lastUpdate}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-white/70">津波情報</span>
+                <span className="text-white font-mono">{lastTsunamiUpdate}</span>
+              </div>
+              <div className="border-t border-white/10 pt-2">
+                <div className="text-white/50 mb-0.5">EEW接続</div>
+                <div className={`font-semibold ${status.includes('Online') ? 'text-green-400' : 'text-yellow-400'}`}>
+                  {status}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Tsunami panel */}
