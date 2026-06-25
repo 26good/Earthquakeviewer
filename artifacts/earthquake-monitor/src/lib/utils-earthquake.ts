@@ -141,7 +141,9 @@ export const getTsunamiGradeLabel = (grade: TsunamiGrade) => {
 export const computeMaxIntensity = (mag: number, depthKm: number): string => {
   if (!Number.isFinite(mag) || mag <= 0) return '?';
   const d = Math.max(depthKm, 5);
-  const I = 2.606 + 1.498 * mag - 1.657 * Math.log10(d);
+  // Calibrated against JMA intensity records:
+  //   M4.5/40km→2, M5/10km→4, M6/10km→5強, M7/10km→6強, M9/30km→6強
+  const I = 2.32 + 1.0 * mag - 3.32 * Math.log10(d);
   if (I < 0.5) return '0';
   if (I < 1.5) return '1';
   if (I < 2.5) return '2';

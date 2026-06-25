@@ -27,6 +27,9 @@ const clearEEW = () => {
   } catch {}
 };
 
+// If no message is received within this time, assume the connection is dead
+const WS_MESSAGE_TIMEOUT_MS = 60 * 1000;
+
 export const useEEW = (isSoundEnabled: boolean) => {
   const [eew, setEEW] = useState<EEWData | null>(loadStoredEEW);
   const [status, setStatus] = useState<string>('Connecting...');
@@ -48,15 +51,30 @@ export const useEEW = (isSoundEnabled: boolean) => {
     let ws: WebSocket;
     let reconnectTimer: ReturnType<typeof setTimeout>;
     let keepAliveTimer: ReturnType<typeof setInterval>;
+    // Detects zombie connections: OPEN state but no messages received
+    let msgTimeoutTimer: ReturnType<typeof setTimeout>;
+
+    const resetMsgTimeout = (wsRef: WebSocket) => {
+      clearTimeout(msgTimeoutTimer);
+      msgTimeoutTimer = setTimeout(() => {
+        // No message for 60 s — force reconnect
+        setStatus('Connection Lost. Reconnecting...');
+        wsRef.close();
+      }, WS_MESSAGE_TIMEOUT_MS);
+    };
 
     const connect = () => {
       ws = new WebSocket('wss://ws-api.wolfx.jp/jma_eew');
 
       ws.onopen = () => {
         setStatus('System Online / EEW Connected');
+        resetMsgTimeout(ws);
       };
 
       ws.onmessage = (event) => {
+        // Reset the dead-connection watchdog on every message (including pings)
+        resetMsgTimeout(ws);
+
         try {
           const data = JSON.parse(event.data);
           if (data.type !== 'jma_eew') return;
@@ -93,21 +111,24 @@ export const useEEW = (isSoundEnabled: boolean) => {
       };
 
       ws.onclose = () => {
+        clearTimeout(msgTimeoutTimer);
         setStatus('Connection Lost. Reconnecting...');
         reconnectTimer = setTimeout(connect, 5000);
       };
 
+      // Send ping every 25 s to keep the connection alive through proxies/firewalls
       keepAliveTimer = setInterval(() => {
         if (ws && ws.readyState === WebSocket.OPEN) {
           ws.send('ping');
         }
-      }, 30000);
+      }, 25000);
     };
 
     connect();
 
     return () => {
       clearTimeout(reconnectTimer);
+      clearTimeout(msgTimeoutTimer);
       clearInterval(keepAliveTimer);
       if (fallbackTimerRef.current) clearTimeout(fallbackTimerRef.current);
       if (ws) ws.close();
