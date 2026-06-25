@@ -56,7 +56,7 @@ export const useTsunami = (isSoundEnabled: boolean) => {
 
   useEffect(() => {
     fetchTsunami();
-    const interval = setInterval(fetchTsunami, 3000);
+    const interval = setInterval(fetchTsunami, 5000);
     return () => clearInterval(interval);
   }, [isSoundEnabled]);
 
