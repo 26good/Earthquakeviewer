@@ -141,10 +141,10 @@ export const getTsunamiGradeLabel = (grade: TsunamiGrade) => {
 export const computeMaxIntensity = (mag: number, depthKm: number): string => {
   if (!Number.isFinite(mag) || mag <= 0) return '?';
   const d = Math.max(depthKm, 5);
-  // Grid-search optimised against 441 JMA records (intensity 4+, 2020-2026).
-  // MSE=0.26, 92.7% within ±1 intensity level.
-  // Tends to underestimate intensity 5強+ due to data imbalance (78% are intensity 4).
-  const I = 2.6 + 0.6 * mag - 1.0 * Math.log10(d);
+  // Grid-search optimised against 1565 JMA records (intensity 4+, 2000-2026).
+  // MSE=0.31, 92.1% within ±1 intensity level.
+  // Tends to underestimate intensity 5強+ due to data imbalance (71% are intensity 4).
+  const I = 2.3 + 0.6 * mag - 0.7 * Math.log10(d);
   if (I < 0.5) return '0';
   if (I < 1.5) return '1';
   if (I < 2.5) return '2';
