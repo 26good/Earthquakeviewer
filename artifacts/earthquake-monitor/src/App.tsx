@@ -39,6 +39,14 @@ const P_WAVE_SPEED = 6.0;
 const S_WAVE_SPEED = 3.5;
 
 
+const arvLabel = (arv: number): string => {
+  if (arv < 0.9) return '揺れにくい地盤';
+  if (arv < 1.3) return '普通の地盤';
+  if (arv < 2.0) return 'やや揺れやすい地盤';
+  if (arv < 3.0) return '揺れやすい地盤';
+  return '非常に揺れやすい地盤';
+};
+
 const haversineKm = (lat1: number, lng1: number, lat2: number, lng2: number) => {
   const R = 6371;
   const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -147,6 +155,7 @@ function Home() {
   const [showLocationPanel, setShowLocationPanel] = useState(false);
   const [bottomTab, setBottomTab] = useState<'history' | 'points'>('history');
   const [showUpdatePanel, setShowUpdatePanel] = useState(false);
+  const [showObsPoints, setShowObsPoints] = useState(true);
   const locationPanelRef = useRef<HTMLDivElement>(null);
   const updatePanelRef = useRef<HTMLDivElement>(null);
 
@@ -430,6 +439,16 @@ function Home() {
     }
   }
 
+  const userNearestPref: string | null = (() => {
+    if (!userLocation) return null;
+    let minDist = Infinity, nearest = '';
+    for (const p of PREF_CENTERS) {
+      const d = haversineKm(userLocation.lat, userLocation.lng, p.lat, p.lng);
+      if (d < minDist) { minDist = d; nearest = p.name; }
+    }
+    return nearest || null;
+  })();
+
   const userLocationIntensity: string | null =
     isEEWMode && countdown && groundInfo
       ? computeIntensityAtLocation(
@@ -495,6 +514,9 @@ function Home() {
         userLocation={userLocation}
         onSetUserLocation={handleSetUserLocation}
         settingLocation={settingLocation}
+        userNearestPref={userNearestPref}
+        userLocationIntensity={userLocationIntensity}
+        showObsPoints={showObsPoints}
       />
 
       {/* Top-right button row */}
@@ -606,14 +628,14 @@ function Home() {
                   <div className="text-white/60 text-[11px] mb-1">あなたの地点の推定震度</div>
                   <div className="flex items-baseline gap-2">
                     <span
-                      className="text-xl font-black px-2 py-0.5 rounded"
+                      className="text-xl font-sans font-black px-2 py-0.5 rounded"
                       style={{ backgroundColor: getIntensityColor(userLocationIntensity), color: '#fff' }}
                     >
                       {userLocationIntensity}
                     </span>
                     {groundInfo && (
                       <span className="text-white/35 text-[10px] leading-tight">
-                        {groundInfo.jname}<br/>ARV {groundInfo.arv.toFixed(2)}
+                        {arvLabel(groundInfo.arv)}
                       </span>
                     )}
                   </div>
@@ -966,6 +988,16 @@ function Home() {
       {/* Status bar */}
       <div className="status-bar absolute bottom-5 right-5 z-50 flex items-center gap-2">
         <button
+          onClick={() => setShowObsPoints(v => !v)}
+          title="観測地点マーカーの表示切替"
+          className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-all cursor-pointer backdrop-blur-md
+            ${showObsPoints
+              ? 'text-[#38bdf8] border-[#38bdf8]/50 bg-[#38bdf8]/10'
+              : 'text-white/35 border-white/10 bg-[#141419]/85 hover:text-white/60'}`}
+        >
+          観測点
+        </button>
+        <button
           onClick={() => toggleTest(isSoundEnabled)}
           className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-all cursor-pointer backdrop-blur-md
             ${isTestMode
@@ -975,7 +1007,7 @@ function Home() {
           {isTestMode ? '⏹ TEST終了' : 'TEST'}
         </button>
         <div className="bg-[#141419]/85 backdrop-blur-md px-4 py-2 rounded-full text-xs text-[#a0a0a8]">
-          {status} | Ver 1.9.0
+          {status} | Ver 2.0.0
         </div>
       </div>
     </div>

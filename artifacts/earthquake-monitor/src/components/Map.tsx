@@ -20,6 +20,9 @@ type Props = {
   userLocation: UserLocation;
   onSetUserLocation: (loc: UserLocation) => void;
   settingLocation: boolean;
+  userNearestPref?: string | null;
+  userLocationIntensity?: string | null;
+  showObsPoints?: boolean;
 };
 
 const P_WAVE_SPEED_KM_PER_SEC = 6.0;
@@ -132,7 +135,7 @@ const useAnimationNow = (active: boolean) => {
   return now;
 };
 
-export const EarthquakeMap = ({ currentQuake, eew, tsunami, tsunamiSource, userLocation, onSetUserLocation, settingLocation }: Props) => {
+export const EarthquakeMap = ({ currentQuake, eew, tsunami, tsunamiSource, userLocation, onSetUserLocation, settingLocation, userNearestPref, userLocationIntensity, showObsPoints = true }: Props) => {
   const [geoData, setGeoData] = useState<any>(null);
 
   const hasTsunamiInfo = !!tsunami && tsunami.areas.length > 0;
@@ -214,6 +217,17 @@ export const EarthquakeMap = ({ currentQuake, eew, tsunami, tsunamiSource, userL
             fillOpacity = 0.78;
           }
         }
+
+        // Override with J-SHIS ARV-corrected intensity for user's nearest prefecture
+        if (userNearestPref && userLocationIntensity) {
+          const prefName = userNearestPref.replace(/[県府都]$/, '');
+          if (featureText.includes(prefName)) {
+            fillColor = getIntensityColor(userLocationIntensity);
+            fillOpacity = 0.92;
+            borderColor = '#ffffff';
+            borderWeight = 2;
+          }
+        }
       }
     }
 
@@ -272,7 +286,7 @@ export const EarthquakeMap = ({ currentQuake, eew, tsunami, tsunamiSource, userL
 
   const tsunamiWaveColor = getTsunamiGradeColor(tsunamiSource?.grade || 'Watch');
 
-  const geoKey = `${currentQuake?.id || 'default'}-${JSON.stringify(tsunamiPrefGrades)}-eew${eew?.Serial || '0'}`;
+  const geoKey = `${currentQuake?.id || 'default'}-${JSON.stringify(tsunamiPrefGrades)}-eew${eew?.Serial || '0'}-up${userNearestPref || ''}-ui${userLocationIntensity || ''}`;
 
   return (
     <MapContainer
@@ -350,7 +364,7 @@ export const EarthquakeMap = ({ currentQuake, eew, tsunami, tsunamiSource, userL
         />
       )}
 
-      {currentQuake && geoData && geoData.features.map((feature: any, i: number) => {
+      {showObsPoints && currentQuake && geoData && geoData.features.map((feature: any, i: number) => {
         let matchedPref: string | null = null;
         for (const pref in prefScales) {
           const prefName = pref.replace(/[県府都]$/, '');
