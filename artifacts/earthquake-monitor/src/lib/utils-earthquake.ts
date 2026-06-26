@@ -157,6 +157,41 @@ export const computeMaxIntensity = (mag: number, depthKm: number): string => {
   return '7';
 };
 
+/**
+ * Estimate seismic intensity at a specific location using hypocentral distance
+ * and J-SHIS ground amplification ratio (ARV).
+ *
+ * Formula:  I = 3.0 + 0.4·M − 0.5·log10(hypoDist) + log10(ARV)
+ *
+ * ARV (地盤増幅率) is from J-SHIS 表層地盤API (V2).
+ * ARV = 1.0  → engineering bedrock reference (no amplification)
+ * ARV = 1.5  → typical plateau / loam ground
+ * ARV = 2-4  → soft alluvial / reclaimed land
+ *
+ * The ARV correction log10(ARV) ≈ +0.35 for loam, +0.6–1.0 for soft soil.
+ */
+export const computeIntensityAtLocation = (
+  mag: number,
+  depthKm: number,
+  epicentralDistKm: number,
+  arv: number,
+): string => {
+  if (!Number.isFinite(mag) || mag <= 0) return '?';
+  const hypoDist = Math.max(Math.sqrt(depthKm ** 2 + epicentralDistKm ** 2), 5);
+  const arvClamped = Math.max(arv, 0.1);
+  const I = 3.0 + 0.4 * mag - 0.5 * Math.log10(hypoDist) + Math.log10(arvClamped);
+  if (I < 0.5) return '0';
+  if (I < 1.5) return '1';
+  if (I < 2.5) return '2';
+  if (I < 3.5) return '3';
+  if (I < 4.5) return '4';
+  if (I < 5.0) return '5弱';
+  if (I < 5.5) return '5強';
+  if (I < 6.0) return '6弱';
+  if (I < 6.5) return '6強';
+  return '7';
+};
+
 export const getTsunamiGradeColor = (grade: TsunamiGrade) => {
   if (grade === 'MajorWarning') return '#8b5cf6';
   if (grade === 'Warning') return '#ef4444';

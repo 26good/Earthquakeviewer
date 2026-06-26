@@ -10,6 +10,7 @@ import { useEEW } from './hooks/use-eew';
 import { useTsunami } from './hooks/use-tsunami';
 import { useNotifications } from './hooks/use-notifications';
 import { useTestMode, PHASE_LABELS, TEST_TOTAL_PHASES } from './hooks/use-test-mode';
+import { useGroundAmplification } from './hooks/use-ground-amplification';
 import { EarthquakeMap } from './components/Map';
 import type { TsunamiSource } from './components/Map';
 import {
@@ -20,6 +21,7 @@ import {
   getTsunamiGradeColor,
   getTsunamiGradeLabel,
   computeMaxIntensity,
+  computeIntensityAtLocation,
   type EEWData,
 } from './lib/utils-earthquake';
 
@@ -151,6 +153,11 @@ function Home() {
   const { isEnabled: notifEnabled, permission: notifPermission, toggle: toggleNotif, notify } = useNotifications();
   const notifyRef = useRef(notify);
   notifyRef.current = notify;
+
+  const { ground: groundInfo } = useGroundAmplification(
+    userLocation?.lat ?? null,
+    userLocation?.lng ?? null,
+  );
 
   // Audio resume
   useEffect(() => {
@@ -423,6 +430,16 @@ function Home() {
     }
   }
 
+  const userLocationIntensity: string | null =
+    isEEWMode && countdown && groundInfo
+      ? computeIntensityAtLocation(
+          currentMagnitude,
+          currentDepth,
+          countdown.distKm,
+          groundInfo.arv,
+        )
+      : null;
+
   // Observation points sorted by scale (highest first)
   const sortedPoints = selectedQuake
     ? [...selectedQuake.points].sort((a, b) => b.scale - a.scale)
@@ -584,6 +601,24 @@ function Home() {
               <div className="text-[#4cc9f0]">P波: {countdown.pSec !== null ? `約 ${countdown.pSec} 秒後` : '通過済み'}</div>
               <div className="text-[#f97316]">S波: {countdown.sSec !== null ? `約 ${countdown.sSec} 秒後` : '通過済み'}</div>
               <div className="text-white/35 pt-0.5">距離 {Math.round(countdown.distKm)} km</div>
+              {userLocationIntensity && (
+                <div className="mt-2 pt-2 border-t border-white/10">
+                  <div className="text-white/60 text-[11px] mb-1">あなたの地点の推定震度</div>
+                  <div className="flex items-baseline gap-2">
+                    <span
+                      className="text-xl font-black px-2 py-0.5 rounded"
+                      style={{ backgroundColor: getIntensityColor(userLocationIntensity), color: '#fff' }}
+                    >
+                      {userLocationIntensity}
+                    </span>
+                    {groundInfo && (
+                      <span className="text-white/35 text-[10px] leading-tight">
+                        {groundInfo.jname}<br/>ARV {groundInfo.arv.toFixed(2)}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           )}
           {isEEWMode && !userLocation && (
