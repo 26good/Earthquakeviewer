@@ -60,13 +60,23 @@ const haversineKm = (lat1: number, lng1: number, lat2: number, lng2: number) => 
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 };
 
-const estimateEEWScale = (distKm: number, magnitude: number): number | null => {
-  const baseMag = Math.max(0, magnitude - 4.0);
-  if (baseMag === 0) return null;
-  const maxDist = 60 + baseMag * 40;
-  if (distKm >= maxDist) return null;
-  const distFactor = 1 - distKm / maxDist;
-  return Math.max(10, Math.min(70, Math.round(10 + baseMag * 20 * distFactor)));
+// Compute JMA intensity scale (×10 integer) from hypocentral distance using
+// calibrated attenuation: I = 3.0 + 0.4·M − 0.5·log10(D), D = hypocentral km.
+// Always returns a value (no null) so every prefecture gets colored.
+const estimateEEWScale = (surfaceDistKm: number, depthKm: number, magnitude: number): number => {
+  if (magnitude <= 0) return 10;
+  const D = Math.sqrt(surfaceDistKm ** 2 + Math.max(5, depthKm) ** 2);
+  const I = 3.0 + 0.4 * magnitude - 0.5 * Math.log10(Math.max(1, D));
+  // Convert continuous intensity to JMA scale×10 steps
+  const steps = [10, 20, 30, 40, 45, 50, 55, 60, 70];
+  const raw = Math.round(I * 10); // e.g. 2.3 → 23
+  // Find nearest step at or below raw
+  let scale = 10;
+  for (const s of steps) {
+    if (raw >= s) scale = s;
+    else break;
+  }
+  return Math.min(70, Math.max(10, scale));
 };
 
 const AutoZoomToEpicenter = ({
@@ -195,8 +205,8 @@ export const EarthquakeMap = ({ currentQuake, eew, tsunami, tsunamiSource, userL
       }
     }
 
-    // EEW shake map: estimate intensity per prefecture from epicenter distance
-    if (!currentQuake && eew && !eew.isCancel && eewEpicenter && eewEpicenter.lat > 0) {
+    // EEW shake map: always override with per-prefecture intensity estimate during active EEW
+    if (eew && !eew.isCancel && eewEpicenter && eewEpicenter.lat > 0) {
       const mag = parseFloat((eew as any).Magunitude || eew.Magnitude || '0');
       if (mag > 0) {
         // Use the largest polygon ring to avoid computing distances to small islands
@@ -210,12 +220,10 @@ export const EarthquakeMap = ({ currentQuake, eew, tsunami, tsunamiSource, userL
         let latSum = 0, lngSum = 0, pts = 0;
         coords.forEach(pt => { lngSum += pt[0]; latSum += pt[1]; pts++; });
         if (pts > 0) {
-          const distKm = haversineKm(latSum / pts, lngSum / pts, eewEpicenter.lat, eewEpicenter.lng);
-          const estimated = estimateEEWScale(distKm, mag);
-          if (estimated !== null) {
-            fillColor = getIntensityColor(estimated);
-            fillOpacity = 0.78;
-          }
+          const surfaceDistKm = haversineKm(latSum / pts, lngSum / pts, eewEpicenter.lat, eewEpicenter.lng);
+          const estimated = estimateEEWScale(surfaceDistKm, eewEpicenter.depth, mag);
+          fillColor = getIntensityColor(estimated);
+          fillOpacity = 0.82;
         }
 
         // Override with J-SHIS ARV-corrected intensity for user's nearest prefecture
