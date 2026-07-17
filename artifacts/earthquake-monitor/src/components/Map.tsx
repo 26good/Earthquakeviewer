@@ -23,6 +23,7 @@ type Props = {
   userNearestPref?: string | null;
   userLocationIntensity?: string | null;
   showObsPoints?: boolean;
+  showEEWMap?: boolean;
 };
 
 const P_WAVE_SPEED_KM_PER_SEC = 6.0;
@@ -145,7 +146,7 @@ const useAnimationNow = (active: boolean) => {
   return now;
 };
 
-export const EarthquakeMap = ({ currentQuake, eew, tsunami, tsunamiSource, userLocation, onSetUserLocation, settingLocation, userNearestPref, userLocationIntensity, showObsPoints = true }: Props) => {
+export const EarthquakeMap = ({ currentQuake, eew, tsunami, tsunamiSource, userLocation, onSetUserLocation, settingLocation, userNearestPref, userLocationIntensity, showObsPoints = true, showEEWMap = true }: Props) => {
   const [geoData, setGeoData] = useState<any>(null);
 
   const hasTsunamiInfo = !!tsunami && tsunami.areas.length > 0;
@@ -206,7 +207,7 @@ export const EarthquakeMap = ({ currentQuake, eew, tsunami, tsunamiSource, userL
     }
 
     // EEW shake map: always override with per-prefecture intensity estimate during active EEW
-    if (eew && !eew.isCancel && eewEpicenter && eewEpicenter.lat > 0) {
+    if (showEEWMap && eew && !eew.isCancel && eewEpicenter && eewEpicenter.lat > 0) {
       const mag = parseFloat((eew as any).Magunitude || eew.Magnitude || '0');
       if (mag > 0) {
         // Use the largest polygon ring to avoid computing distances to small islands

@@ -156,6 +156,8 @@ function Home() {
   const [bottomTab, setBottomTab] = useState<'history' | 'points'>('history');
   const [showUpdatePanel, setShowUpdatePanel] = useState(false);
   const [showObsPoints, setShowObsPoints] = useState(true);
+  const [leftTab, setLeftTab] = useState<'quake' | 'settings'>('quake');
+  const [showEEWMap, setShowEEWMap] = useState(true);
   const locationPanelRef = useRef<HTMLDivElement>(null);
   const updatePanelRef = useRef<HTMLDivElement>(null);
 
@@ -517,6 +519,7 @@ function Home() {
         userNearestPref={userNearestPref}
         userLocationIntensity={userLocationIntensity}
         showObsPoints={showObsPoints}
+        showEEWMap={showEEWMap}
       />
 
       {/* Top-right button row */}
@@ -651,9 +654,26 @@ function Home() {
       )}
 
       {/* Left panel */}
-      <div className={`ui-layer absolute ${isTestMode ? 'top-14' : 'top-5'} left-5 w-[350px] h-[calc(100vh-40px)] z-50 flex flex-col gap-4 pointer-events-none`}>
+      <div className={`ui-layer absolute ${isTestMode ? 'top-14' : 'top-5'} left-5 w-[350px] h-[calc(100vh-40px)] z-50 flex flex-col gap-3 pointer-events-none`}>
 
-        {displayData && (
+        {/* Main tab bar: 地震情報 / 設定 */}
+        <div className="flex flex-shrink-0 rounded-xl overflow-hidden border border-white/10 bg-[#141419]/85 backdrop-blur-md pointer-events-auto shadow-xl">
+          <button
+            className={`flex-1 py-2.5 text-sm font-semibold transition-colors cursor-pointer ${leftTab === 'quake' ? 'bg-white/12 text-white' : 'text-white/45 hover:text-white/70'}`}
+            onClick={() => setLeftTab('quake')}
+          >
+            地震情報
+          </button>
+          <div className="w-px bg-white/10 self-stretch" />
+          <button
+            className={`flex-1 py-2.5 text-sm font-semibold transition-colors cursor-pointer ${leftTab === 'settings' ? 'bg-white/12 text-white' : 'text-white/45 hover:text-white/70'}`}
+            onClick={() => setLeftTab('settings')}
+          >
+            ⚙ 設定
+          </button>
+        </div>
+
+        {leftTab === 'quake' && displayData && (
           <div className={`rounded-xl overflow-hidden shadow-2xl flex-shrink-0 border border-white/10 transition-colors duration-300 pointer-events-auto
             ${isEEWMode ? (isWarning ? 'bg-[#d33c30]/10' : 'bg-[#d37e30]/10') : 'bg-[#202434]'}`}
           >
@@ -799,7 +819,7 @@ function Home() {
           </div>
         )}
 
-        {/* Bottom tab panel: 地震履歴 / 観測地点 */}
+        {leftTab === 'quake' && (
         <div className="glass-panel flex-grow flex flex-col overflow-hidden min-h-0 rounded-xl pointer-events-auto">
           {/* Tab bar */}
           <div className="flex border-b border-white/10 flex-shrink-0">
@@ -892,6 +912,79 @@ function Home() {
             </div>
           )}
         </div>
+        )}
+
+        {leftTab === 'settings' && (
+          <div className="glass-panel flex-grow rounded-xl pointer-events-auto overflow-y-auto custom-scrollbar p-4 flex flex-col gap-5">
+            <div>
+              <div className="text-[11px] font-bold text-white/40 uppercase tracking-widest mb-3">表示</div>
+              <div className="flex flex-col gap-2">
+                <label className="flex items-center justify-between cursor-pointer">
+                  <div>
+                    <div className="text-sm font-semibold text-white/90">観測点マーカー</div>
+                    <div className="text-[11px] text-white/40">震度数字を地図に表示</div>
+                  </div>
+                  <button
+                    onClick={() => setShowObsPoints(v => !v)}
+                    className={`relative w-11 h-6 rounded-full transition-colors duration-200 border ${showObsPoints ? 'bg-[#38bdf8] border-[#38bdf8]' : 'bg-white/10 border-white/20'}`}
+                  >
+                    <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform duration-200 ${showObsPoints ? 'translate-x-5' : 'translate-x-0'}`} />
+                  </button>
+                </label>
+                <label className="flex items-center justify-between cursor-pointer">
+                  <div>
+                    <div className="text-sm font-semibold text-white/90">EEW推定震度マップ</div>
+                    <div className="text-[11px] text-white/40">EEW発報時に全県の推定震度を塗る</div>
+                  </div>
+                  <button
+                    onClick={() => setShowEEWMap(v => !v)}
+                    className={`relative w-11 h-6 rounded-full transition-colors duration-200 border ${showEEWMap ? 'bg-[#38bdf8] border-[#38bdf8]' : 'bg-white/10 border-white/20'}`}
+                  >
+                    <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform duration-200 ${showEEWMap ? 'translate-x-5' : 'translate-x-0'}`} />
+                  </button>
+                </label>
+              </div>
+            </div>
+
+            <div className="border-t border-white/8 pt-4">
+              <div className="text-[11px] font-bold text-white/40 uppercase tracking-widest mb-3">音声</div>
+              <div className="flex flex-col gap-2">
+                <label className="flex items-center justify-between cursor-pointer">
+                  <div>
+                    <div className="text-sm font-semibold text-white/90">アラート音</div>
+                    <div className="text-[11px] text-white/40">EEW・津波警報時の音声通知</div>
+                  </div>
+                  <button
+                    onClick={handleSoundToggle}
+                    className={`relative w-11 h-6 rounded-full transition-colors duration-200 border ${isSoundEnabled ? 'bg-[#38bdf8] border-[#38bdf8]' : 'bg-white/10 border-white/20'}`}
+                  >
+                    <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform duration-200 ${isSoundEnabled ? 'translate-x-5' : 'translate-x-0'}`} />
+                  </button>
+                </label>
+              </div>
+            </div>
+
+            <div className="border-t border-white/8 pt-4">
+              <div className="text-[11px] font-bold text-white/40 uppercase tracking-widest mb-3">震度スケール</div>
+              <div className="grid grid-cols-3 gap-1.5">
+                {([10,20,30,40,45,50,55,60,70] as const).map(s => (
+                  <div key={s} className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 bg-black/30 border border-white/5">
+                    <div className="w-5 h-5 rounded flex items-center justify-center text-[11px] font-black text-white shrink-0"
+                      style={{ backgroundColor: getIntensityColor(s) }}>
+                      {SCALE_LABELS[s]}
+                    </div>
+                    <div className="text-[10px] text-white/50 leading-tight">{getIntensityColor(s)}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="border-t border-white/8 pt-4 mt-auto">
+              <div className="text-[11px] text-white/25 text-center">地震監視モニター Ver 2.0.0</div>
+            </div>
+          </div>
+        )}
+
       </div>
 
       {/* Clock + update status */}
@@ -987,16 +1080,6 @@ function Home() {
 
       {/* Status bar */}
       <div className="status-bar absolute bottom-5 right-5 z-50 flex items-center gap-2">
-        <button
-          onClick={() => setShowObsPoints(v => !v)}
-          title="観測地点マーカーの表示切替"
-          className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-all cursor-pointer backdrop-blur-md
-            ${showObsPoints
-              ? 'text-[#38bdf8] border-[#38bdf8]/50 bg-[#38bdf8]/10'
-              : 'text-white/35 border-white/10 bg-[#141419]/85 hover:text-white/60'}`}
-        >
-          観測点
-        </button>
         <button
           onClick={() => toggleTest(isSoundEnabled)}
           className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-all cursor-pointer backdrop-blur-md
