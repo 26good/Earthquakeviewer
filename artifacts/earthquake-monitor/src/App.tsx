@@ -5,13 +5,11 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 import { initAudioContext } from './lib/audio';
-import { log, subscribeLogs, getCategoryColor, type LogEntry } from './lib/logger';
 import { useEarthquakes } from './hooks/use-earthquakes';
 import { useEEW } from './hooks/use-eew';
 import { useTsunami } from './hooks/use-tsunami';
 import { useNotifications } from './hooks/use-notifications';
 import { useTestMode, PHASE_LABELS, TEST_TOTAL_PHASES } from './hooks/use-test-mode';
-import { useP2PQuakeWS } from './hooks/use-p2pquake-ws';
 import { useGroundAmplification } from './hooks/use-ground-amplification';
 import { EarthquakeMap } from './components/Map';
 import type { TsunamiSource } from './components/Map';
@@ -160,9 +158,6 @@ function Home() {
   const [showObsPoints, setShowObsPoints] = useState(true);
   const [leftTab, setLeftTab] = useState<'quake' | 'settings'>('quake');
   const [showEEWMap, setShowEEWMap] = useState(true);
-  const [sandboxMode, setSandboxMode] = useState(false);
-  const [showLogPanel, setShowLogPanel] = useState(false);
-  const [logEntries, setLogEntries] = useState<LogEntry[]>([]);
   const locationPanelRef = useRef<HTMLDivElement>(null);
   const updatePanelRef = useRef<HTMLDivElement>(null);
 
@@ -227,31 +222,15 @@ function Home() {
     setShowLocationPanel(false);
   }, []);
 
-  const { history: liveHistory, selectedQuake: liveSelectedQuake, setSelectedQuake, lastUpdate } = useEarthquakes(isSoundEnabled);
-  const { eew: liveEEW, status: wolfxStatus } = useEEW(isSoundEnabled);
+  const { history, selectedQuake: liveSelectedQuake, setSelectedQuake, lastUpdate } = useEarthquakes(isSoundEnabled);
+  const { eew: liveEEW, status } = useEEW(isSoundEnabled);
   const { tsunami: liveTsunami, lastTsunamiUpdate } = useTsunami(isSoundEnabled);
-
-  // ── P2PQuake Sandbox WS ────────────────────────────────────────────────
-  const {
-    eew: sbxEEW,
-    history: sbxHistory,
-    selectedQuake: sbxSelectedQuake,
-    tsunami: sbxTsunami,
-    sbxStatus,
-    setSelectedQuake: sbxSetSelectedQuake,
-  } = useP2PQuakeWS(sandboxMode, isSoundEnabled);
-
-  const history = sandboxMode ? sbxHistory : liveHistory;
-  const liveSrcSelectedQuake = sandboxMode ? sbxSelectedQuake : liveSelectedQuake;
-  const status = sandboxMode
-    ? (sbxStatus === 'connected' ? 'Sandbox Connected' : sbxStatus === 'connecting' ? 'Sandbox Connecting...' : sbxStatus === 'error' ? 'Sandbox Error' : 'Sandbox Off')
-    : wolfxStatus;
 
   // ── Test mode ──────────────────────────────────────────────────────────
   const { isTestMode, testEEW, testQuake, testTsunami, testPhase, toggle: toggleTest } = useTestMode();
-  const eew = isTestMode ? testEEW : (sandboxMode ? sbxEEW : liveEEW);
-  const selectedQuake = isTestMode ? testQuake : liveSrcSelectedQuake;
-  const tsunami = isTestMode ? testTsunami : (sandboxMode ? sbxTsunami : liveTsunami);
+  const eew = isTestMode ? testEEW : liveEEW;
+  const selectedQuake = isTestMode ? testQuake : liveSelectedQuake;
+  const tsunami = isTestMode ? testTsunami : liveTsunami;
   const isTestModeRef = useRef(false);
   isTestModeRef.current = isTestMode;
 
@@ -262,21 +241,10 @@ function Home() {
         e.preventDefault();
         toggleTest(isSoundEnabled);
       }
-      if (e.shiftKey && e.key.toLowerCase() === 's') {
-        e.preventDefault();
-        setShowLogPanel(v => !v);
-      }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [toggleTest, isSoundEnabled]);
-
-  // Log subscription
-  useEffect(() => {
-    return subscribeLogs((entry) => {
-      setLogEntries(prev => [entry, ...prev].slice(0, 200));
-    });
-  }, []);
   // ───────────────────────────────────────────────────────────────────────
 
   // ── Notification triggers ──────────────────────────────────────────────
@@ -888,7 +856,7 @@ function Home() {
                       key={eq.id}
                       className={`flex items-center bg-black/30 border border-white/5 rounded-lg p-2 gap-2 cursor-pointer transition-colors duration-200 flex-shrink-0 hover:bg-white/10
                         ${selectedQuake?.id === eq.id ? 'ring-1 ring-[#4cd0a7] bg-white/5' : ''}`}
-                      onClick={() => sandboxMode ? sbxSetSelectedQuake(eq) : setSelectedQuake(eq)}
+                      onClick={() => setSelectedQuake(eq)}
                     >
                       <div className={`min-w-[32px] h-[32px] rounded-full flex items-center justify-center font-mono text-base border-2 border-white/20 scale-${scale}`}>
                         {getScaleText(scale)}
@@ -1011,35 +979,6 @@ function Home() {
               </div>
             </div>
 
-            <div className="border-t border-white/8 pt-4">
-              <div className="text-[11px] font-bold text-white/40 uppercase tracking-widest mb-3">データソース</div>
-              <div className="flex flex-col gap-2">
-                <label className="flex items-center justify-between cursor-pointer">
-                  <div>
-                    <div className="text-sm font-semibold text-white/90">P2Pサンドボックス</div>
-                    <div className="text-[11px] text-white/40">P2PQuake過去データWS（2023年）で動作確認</div>
-                  </div>
-                  <button
-                    onClick={() => setSandboxMode(v => !v)}
-                    className={`relative w-11 h-6 rounded-full transition-colors duration-200 border ${sandboxMode ? 'bg-amber-500 border-amber-400' : 'bg-white/10 border-white/20'}`}
-                  >
-                    <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform duration-200 ${sandboxMode ? 'translate-x-5' : 'translate-x-0'}`} />
-                  </button>
-                </label>
-                {sandboxMode && (
-                  <div className={`rounded-lg px-3 py-2 text-[11px] border ${
-                    sbxStatus === 'connected' ? 'bg-amber-900/30 border-amber-600/40 text-amber-300' :
-                    sbxStatus === 'connecting' ? 'bg-white/5 border-white/10 text-white/40' :
-                    'bg-red-900/30 border-red-600/40 text-red-400'
-                  }`}>
-                    {sbxStatus === 'connected' ? '✓ サンドボックス接続中 — 2023年データ再生中' :
-                     sbxStatus === 'connecting' ? '接続中...' :
-                     sbxStatus === 'error' ? '⚠ 接続エラー — 再試行中' : ''}
-                  </div>
-                )}
-              </div>
-            </div>
-
             <div className="border-t border-white/8 pt-4 mt-auto">
               <div className="text-[11px] text-white/25 text-center">地震監視モニター Ver 2.0.0</div>
             </div>
@@ -1139,62 +1078,8 @@ function Home() {
         </div>
       )}
 
-      {/* System log panel */}
-      {showLogPanel && (
-        <div className="absolute top-20 left-[390px] z-50 w-[420px] max-w-[calc(100vw-420px)] rounded-2xl border border-white/15 bg-[#141419]/95 p-4 text-white backdrop-blur-md shadow-2xl">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-bold">システムログ</span>
-              <span className="text-[10px] text-white/40 font-mono">Shift+Sでトグル</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="text-[10px] text-white/30">{logEntries.length}/200</span>
-              <button
-                onClick={() => setLogEntries([])}
-                className="px-2 py-0.5 rounded text-[10px] text-white/40 hover:text-white/70 hover:bg-white/5 transition-colors cursor-pointer"
-              >
-                クリア
-              </button>
-              <button
-                onClick={() => setShowLogPanel(false)}
-                className="px-2 py-0.5 rounded text-xs text-white/40 hover:text-white/70 hover:bg-white/5 transition-colors cursor-pointer"
-              >
-                ×
-              </button>
-            </div>
-          </div>
-          <div className="max-h-[320px] overflow-y-auto custom-scrollbar flex flex-col gap-1">
-            {logEntries.length === 0 && (
-              <div className="text-xs text-white/25 py-4 text-center">ログはまだありません</div>
-            )}
-            {logEntries.map(entry => (
-              <div key={entry.id} className="flex items-start gap-2 text-xs font-mono leading-tight">
-                <span className="text-white/30 shrink-0">{entry.time}</span>
-                <span
-                  className="px-1 py-0.5 rounded text-[10px] font-bold shrink-0 uppercase"
-                  style={{ color: getCategoryColor(entry.category), backgroundColor: `${getCategoryColor(entry.category)}15` }}
-                >
-                  {entry.category}
-                </span>
-                <span className="text-white/80">{entry.message}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
       {/* Status bar */}
       <div className="status-bar absolute bottom-5 right-5 z-50 flex items-center gap-2">
-        <button
-          onClick={() => setShowLogPanel(v => !v)}
-          title="システムログ パネル (Shift+S)"
-          className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-all cursor-pointer backdrop-blur-md
-            ${showLogPanel
-              ? 'text-[#a78bfa] border-[#a78bfa]/50 bg-[#a78bfa]/10'
-              : 'text-white/35 border-white/10 bg-[#141419]/85 hover:text-white/60'}`}
-        >
-          LOG
-        </button>
         <button
           onClick={() => toggleTest(isSoundEnabled)}
           className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-all cursor-pointer backdrop-blur-md
@@ -1204,11 +1089,6 @@ function Home() {
         >
           {isTestMode ? '⏹ TEST終了' : 'TEST'}
         </button>
-        {sandboxMode && (
-          <div className="px-3 py-1.5 rounded-full text-xs font-bold border text-amber-300 border-amber-500/50 bg-amber-900/40 backdrop-blur-md">
-            SBX
-          </div>
-        )}
         <div className="bg-[#141419]/85 backdrop-blur-md px-4 py-2 rounded-full text-xs text-[#a0a0a8]">
           {status} | Ver 2.0.0
         </div>

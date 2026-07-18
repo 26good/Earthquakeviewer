@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { EEWData } from '../lib/utils-earthquake';
 import { playSound } from '../lib/audio';
-import { log } from '../lib/logger';
 
 const EEW_STORAGE_KEY = 'eew_last_v2';
 const EEW_MAX_AGE_MS = 3 * 60 * 1000;
@@ -70,7 +69,6 @@ export const useEEW = (isSoundEnabled: boolean) => {
       ws.onopen = () => {
         setStatus('System Online / EEW Connected');
         resetMsgTimeout(ws);
-        log('SYSTEM', 'EEW WebSocket 接続しました');
       };
 
       ws.onmessage = (event) => {
@@ -86,11 +84,8 @@ export const useEEW = (isSoundEnabled: boolean) => {
             clearEEW();
             if (fallbackTimerRef.current) clearTimeout(fallbackTimerRef.current);
             if (isSoundEnabled) playSound.end();
-            log('EEW', `EEW 解除 — ${data.Hypocenter || ''}`);
             return;
           }
-
-          log('EEW', `第${data.Serial}報 ${data.Hypocenter} M${data.Magnitude || ''} 推定震度${data.MaxInt || ''}`);
 
           const prevEEW = loadStoredEEW();
           const isNew = !prevEEW || prevEEW.Serial !== data.Serial;
@@ -119,7 +114,6 @@ export const useEEW = (isSoundEnabled: boolean) => {
         clearTimeout(msgTimeoutTimer);
         setStatus('Connection Lost. Reconnecting...');
         reconnectTimer = setTimeout(connect, 5000);
-        log('SYSTEM', 'EEW WebSocket 切断 — 5秒後に再接続');
       };
 
       // Send ping every 25 s to keep the connection alive through proxies/firewalls
