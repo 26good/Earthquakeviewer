@@ -11,6 +11,7 @@ import { useTsunami } from './hooks/use-tsunami';
 import { useNotifications } from './hooks/use-notifications';
 import { useTestMode, PHASE_LABELS, TEST_TOTAL_PHASES } from './hooks/use-test-mode';
 import { useGroundAmplification } from './hooks/use-ground-amplification';
+import { useP2PQuakeRealtime } from './hooks/use-p2pquake-sandbox';
 import { EarthquakeMap } from './components/Map';
 import type { TsunamiSource } from './components/Map';
 import {
@@ -158,6 +159,7 @@ function Home() {
   const [showObsPoints, setShowObsPoints] = useState(true);
   const [leftTab, setLeftTab] = useState<'quake' | 'settings'>('quake');
   const [showEEWMap, setShowEEWMap] = useState(true);
+  const [isSandboxMode, setIsSandboxMode] = useState(false);
   const locationPanelRef = useRef<HTMLDivElement>(null);
   const updatePanelRef = useRef<HTMLDivElement>(null);
 
@@ -225,12 +227,14 @@ function Home() {
   const { history, selectedQuake: liveSelectedQuake, setSelectedQuake, lastUpdate } = useEarthquakes(isSoundEnabled);
   const { eew: liveEEW, status } = useEEW(isSoundEnabled);
   const { tsunami: liveTsunami, lastTsunamiUpdate } = useTsunami(isSoundEnabled);
+  const p2pRealtime = useP2PQuakeRealtime(isSandboxMode, isSoundEnabled);
 
   // ── Test mode ──────────────────────────────────────────────────────────
   const { isTestMode, testEEW, testQuake, testTsunami, testPhase, toggle: toggleTest } = useTestMode();
-  const eew = isTestMode ? testEEW : liveEEW;
-  const selectedQuake = isTestMode ? testQuake : liveSelectedQuake;
-  const tsunami = isTestMode ? testTsunami : liveTsunami;
+  const eew = isTestMode ? testEEW : isSandboxMode ? p2pRealtime.eew : liveEEW;
+  const selectedQuake = isTestMode ? testQuake : isSandboxMode ? p2pRealtime.quake : liveSelectedQuake;
+  const tsunami = isTestMode ? testTsunami : isSandboxMode ? p2pRealtime.tsunami : liveTsunami;
+  const sandboxStatus = isSandboxMode ? p2pRealtime.status : null;
   const isTestModeRef = useRef(false);
   isTestModeRef.current = isTestMode;
 
@@ -979,6 +983,30 @@ function Home() {
               </div>
             </div>
 
+            <div className="border-t border-white/8 pt-4">
+              <div className="text-[11px] font-bold text-white/40 uppercase tracking-widest mb-3">データソース</div>
+              <div className="flex flex-col gap-2">
+                <label className="flex items-center justify-between cursor-pointer">
+                  <div>
+                    <div className="text-sm font-semibold text-white/90">P2P地震情報 サンドボックス</div>
+                    <div className="text-[11px] text-white/40">過去の地震・津波データを約30秒間隔で再生</div>
+                  </div>
+                  <button
+                    onClick={() => setIsSandboxMode(v => !v)}
+                    className={`relative w-11 h-6 rounded-full transition-colors duration-200 border ${isSandboxMode ? 'bg-amber-500 border-amber-500' : 'bg-white/10 border-white/20'}`}
+                  >
+                    <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform duration-200 ${isSandboxMode ? 'translate-x-5' : 'translate-x-0'}`} />
+                  </button>
+                </label>
+                {isSandboxMode && (
+                  <div className="text-[10px] text-amber-400/80 bg-amber-400/8 rounded-lg px-2 py-1.5 border border-amber-400/15">
+                    接続先: wss://api-realtime-sandbox.p2pquake.net/v2/ws
+                    <br />再生中: 2023/4/1〜10/19の地震・津波データ
+                  </div>
+                )}
+              </div>
+            </div>
+
             <div className="border-t border-white/8 pt-4 mt-auto">
               <div className="text-[11px] text-white/25 text-center">地震監視モニター Ver 2.0.0</div>
             </div>
@@ -1090,7 +1118,7 @@ function Home() {
           {isTestMode ? '⏹ TEST終了' : 'TEST'}
         </button>
         <div className="bg-[#141419]/85 backdrop-blur-md px-4 py-2 rounded-full text-xs text-[#a0a0a8]">
-          {status} | Ver 2.0.0
+          {isSandboxMode ? (sandboxStatus || 'Sandbox...') : status} | Ver 2.0.0
         </div>
       </div>
     </div>

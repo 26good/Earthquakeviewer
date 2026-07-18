@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Circle, GeoJSON, MapContainer, Marker, useMap, useMapEvents, ZoomControl } from 'react-leaflet';
+import { Circle, GeoJSON, MapContainer, Marker, Polyline, useMap, useMapEvents, ZoomControl } from 'react-leaflet';
 import L from 'leaflet';
 import { EEWData, EarthquakeHistoryItem, TsunamiInfo, getIntensityColor, getScaleText, getTsunamiGradeColor } from '../lib/utils-earthquake';
 
@@ -146,6 +146,118 @@ const useAnimationNow = (active: boolean) => {
   return now;
 };
 
+// Extract coastline (non-shared edges) from prefecture GeoJSON.
+// Returns array of { pref, coords } where coords are [lat,lng] chains.
+const extractCoastlines = (geoData: any): Array<{ pref: string; coords: [number, number][] }> => {
+  if (!geoData?.features) return [];
+  const edgeCounts = new Map<string, number>();
+  const edgeToPref = new Map<string, string>();
+
+  for (const feature of geoData.features) {
+    const pref = feature.properties?.nam_ja || feature.properties?.name || '';
+    const geom = feature.geometry;
+    if (!geom || !pref) continue;
+    const rings: number[][][] = [];
+    if (geom.type === 'Polygon') rings.push(...geom.coordinates);
+    else if (geom.type === 'MultiPolygon') for (const poly of geom.coordinates) rings.push(...poly);
+
+    for (const ring of rings) {
+      for (let i = 0; i < ring.length - 1; i++) {
+        const a = `${ring[i][0].toFixed(5)},${ring[i][1].toFixed(5)}`;
+        const b = `${ring[i + 1][0].toFixed(5)},${ring[i + 1][1].toFixed(5)}`;
+        const k = a < b ? `${a}|${b}` : `${b}|${a}`;
+        edgeCounts.set(k, (edgeCounts.get(k) || 0) + 1);
+        edgeToPref.set(k, pref);
+      }
+    }
+  }
+
+  const coastEdges = new Map<string, Array<[number, number]>>();
+  for (const feature of geoData.features) {
+    const pref = feature.properties?.nam_ja || feature.properties?.name || '';
+    const geom = feature.geometry;
+    if (!geom || !pref) continue;
+    const rings: number[][][] = [];
+    if (geom.type === 'Polygon') rings.push(...geom.coordinates);
+    else if (geom.type === 'MultiPolygon') for (const poly of geom.coordinates) rings.push(...poly);
+
+    for (const ring of rings) {
+      for (let i = 0; i < ring.length - 1; i++) {
+        const a = `${ring[i][0].toFixed(5)},${ring[i][1].toFixed(5)}`;
+        const b = `${ring[i + 1][0].toFixed(5)},${ring[i + 1][1].toFixed(5)}`;
+        const k = a < b ? `${a}|${b}` : `${b}|${a}`;
+        if (edgeCounts.get(k) === 1) {
+          if (!coastEdges.has(pref)) coastEdges.set(pref, []);
+          coastEdges.get(pref)!.push([ring[i][1], ring[i][0]]);
+        }
+      }
+    }
+  }
+
+  const result: Array<{ pref: string; coords: [number, number][] }> = [];
+  for (const [pref, edges] of coastEdges) {
+    if (edges.length === 0) continue;
+    const adj = new Map<string, [number, number][]>();
+    const makeKey = (lat: number, lng: number) => `${lat.toFixed(5)},${lng.toFixed(5)}`;
+    for (const [lat, lng] of edges) {
+      const ak = makeKey(lat, lng);
+      if (!adj.has(ak)) adj.set(ak, []);
+    }
+    for (let i = 0; i < edges.length - 1; i++) {
+      const a = edges[i], b = edges[i + 1];
+      const ak = makeKey(a[0], a[1]), bk = makeKey(b[0], b[1]);
+      adj.get(ak)!.push(b);
+      adj.get(bk)!.push(a);
+    }
+
+    const used = new Set<string>();
+    for (const [start] of adj) {
+      if (used.has(start)) continue;
+      const startNeighbors = adj.get(start) || [];
+      if (startNeighbors.length !== 1 && adj.size > 1) continue;
+
+      const chain: [number, number][] = [];
+      let current = start, prev: string | null = null;
+      while (true) {
+        used.add(current);
+        const [lat, lng] = current.split(',').map(Number);
+        chain.push([lat, lng]);
+        const neighbors = (adj.get(current) || []).filter(n => {
+          const nk = makeKey(n[0], n[1]);
+          return nk !== prev && !used.has(nk);
+        });
+        if (!neighbors.length) break;
+        prev = current;
+        current = makeKey(neighbors[0][0], neighbors[0][1]);
+      }
+      if (chain.length >= 2) result.push({ pref, coords: chain });
+    }
+
+    for (const [start] of adj) {
+      if (used.has(start)) continue;
+      const chain: [number, number][] = [];
+      let current = start, prev: string | null = null;
+      while (true) {
+        used.add(current);
+        const [lat, lng] = current.split(',').map(Number);
+        chain.push([lat, lng]);
+        const neighbors = (adj.get(current) || []).filter(n => {
+          const nk = makeKey(n[0], n[1]);
+          return nk !== prev;
+        });
+        if (!neighbors.length) break;
+        const next = neighbors[0];
+        const nk = makeKey(next[0], next[1]);
+        if (nk === start) { chain.push([next[0], next[1]]); break; }
+        prev = current;
+        current = nk;
+      }
+      if (chain.length >= 2) result.push({ pref, coords: chain });
+    }
+  }
+  return result;
+};
+
 export const EarthquakeMap = ({ currentQuake, eew, tsunami, tsunamiSource, userLocation, onSetUserLocation, settingLocation, userNearestPref, userLocationIntensity, showObsPoints = true, showEEWMap = true }: Props) => {
   const [geoData, setGeoData] = useState<any>(null);
 
@@ -159,6 +271,8 @@ export const EarthquakeMap = ({ currentQuake, eew, tsunami, tsunamiSource, userL
       }
     });
   });
+
+  const coastlines = useMemo(() => geoData ? extractCoastlines(geoData) : [], [geoData]);
 
   const eewEpicenter =
     eew && !eew.isCancel
@@ -240,17 +354,6 @@ export const EarthquakeMap = ({ currentQuake, eew, tsunami, tsunamiSource, userL
       }
     }
 
-    if (hasTsunamiInfo) {
-      for (const pref in tsunamiPrefGrades) {
-        const prefName = pref.replace(/[県府都]$/, '');
-        if (featureText.includes(prefName)) {
-          borderColor = getTsunamiGradeColor(tsunamiPrefGrades[pref]);
-          borderWeight = 2.5;
-          break;
-        }
-      }
-    }
-
     return {
       color: borderColor,
       weight: borderWeight,
@@ -314,6 +417,27 @@ export const EarthquakeMap = ({ currentQuake, eew, tsunami, tsunamiSource, userL
       {geoData && (
         <GeoJSON key={geoKey} data={geoData} style={getStyle} />
       )}
+
+      {/* Tsunami coastline highlights: only coast-facing edges colored */}
+      {hasTsunamiInfo && coastlines.map((coast, i) => {
+        const grade = tsunamiPrefGrades[coast.pref];
+        if (!grade) return null;
+        const color = getTsunamiGradeColor(grade);
+        return (
+          <Polyline
+            key={`tsunami-coast-${i}`}
+            positions={coast.coords}
+            pathOptions={{
+              color,
+              weight: 3.5,
+              opacity: 0.92,
+              lineCap: 'round',
+              lineJoin: 'round',
+            }}
+            interactive={false}
+          />
+        );
+      })}
 
       {/* EEW P wave */}
       {waveEpicenter && pWaveRadius > 0 && (
