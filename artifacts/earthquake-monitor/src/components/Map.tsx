@@ -146,113 +146,62 @@ const useAnimationNow = (active: boolean) => {
   return now;
 };
 
-// Extract coastline (non-shared edges) from prefecture GeoJSON.
-// Returns array of { pref, coords } where coords are [lat,lng] chains.
+// Extract coastline segments from prefecture GeoJSON.
+// A coastline edge is an outer-ring edge that appears in exactly one prefecture
+// (not shared with any neighbour). Holes (inner rings) are ignored.
 const extractCoastlines = (geoData: any): Array<{ pref: string; coords: [number, number][] }> => {
   if (!geoData?.features) return [];
+
+  // --- Step 1: Count every edge on every outer ring ---
   const edgeCounts = new Map<string, number>();
-  const edgeToPref = new Map<string, string>();
-
   for (const feature of geoData.features) {
-    const pref = feature.properties?.nam_ja || feature.properties?.name || '';
     const geom = feature.geometry;
-    if (!geom || !pref) continue;
-    const rings: number[][][] = [];
-    if (geom.type === 'Polygon') rings.push(...geom.coordinates);
-    else if (geom.type === 'MultiPolygon') for (const poly of geom.coordinates) rings.push(...poly);
+    if (!geom) continue;
+    const outerRings: number[][][] = [];
+    if (geom.type === 'Polygon') outerRings.push(geom.coordinates[0]);
+    else if (geom.type === 'MultiPolygon')
+      for (const poly of geom.coordinates) outerRings.push(poly[0]);
 
-    for (const ring of rings) {
+    for (const ring of outerRings) {
+      if (!ring || ring.length < 2) continue;
       for (let i = 0; i < ring.length - 1; i++) {
-        const a = `${ring[i][0].toFixed(5)},${ring[i][1].toFixed(5)}`;
-        const b = `${ring[i + 1][0].toFixed(5)},${ring[i + 1][1].toFixed(5)}`;
+        const a = `${ring[i][0]},${ring[i][1]}`;
+        const b = `${ring[i + 1][0]},${ring[i + 1][1]}`;
         const k = a < b ? `${a}|${b}` : `${b}|${a}`;
         edgeCounts.set(k, (edgeCounts.get(k) || 0) + 1);
-        edgeToPref.set(k, pref);
       }
     }
   }
 
-  const coastEdges = new Map<string, Array<[number, number]>>();
+  // --- Step 2: Walk each outer ring and emit coast segments ---
+  const result: Array<{ pref: string; coords: [number, number][] }> = [];
   for (const feature of geoData.features) {
     const pref = feature.properties?.nam_ja || feature.properties?.name || '';
     const geom = feature.geometry;
     if (!geom || !pref) continue;
-    const rings: number[][][] = [];
-    if (geom.type === 'Polygon') rings.push(...geom.coordinates);
-    else if (geom.type === 'MultiPolygon') for (const poly of geom.coordinates) rings.push(...poly);
+    const outerRings: number[][][] = [];
+    if (geom.type === 'Polygon') outerRings.push(geom.coordinates[0]);
+    else if (geom.type === 'MultiPolygon')
+      for (const poly of geom.coordinates) outerRings.push(poly[0]);
 
-    for (const ring of rings) {
+    for (const ring of outerRings) {
+      if (!ring || ring.length < 2) continue;
+      let seg: [number, number][] = [];
       for (let i = 0; i < ring.length - 1; i++) {
-        const a = `${ring[i][0].toFixed(5)},${ring[i][1].toFixed(5)}`;
-        const b = `${ring[i + 1][0].toFixed(5)},${ring[i + 1][1].toFixed(5)}`;
+        const a = `${ring[i][0]},${ring[i][1]}`;
+        const b = `${ring[i + 1][0]},${ring[i + 1][1]}`;
         const k = a < b ? `${a}|${b}` : `${b}|${a}`;
         if (edgeCounts.get(k) === 1) {
-          if (!coastEdges.has(pref)) coastEdges.set(pref, []);
-          coastEdges.get(pref)!.push([ring[i][1], ring[i][0]]);
+          // coast edge
+          if (seg.length === 0) seg.push([ring[i][1], ring[i][0]]);
+          seg.push([ring[i + 1][1], ring[i + 1][0]]);
+        } else {
+          // shared edge — flush current segment
+          if (seg.length >= 2) result.push({ pref, coords: seg });
+          seg = [];
         }
       }
-    }
-  }
-
-  const result: Array<{ pref: string; coords: [number, number][] }> = [];
-  for (const [pref, edges] of coastEdges) {
-    if (edges.length === 0) continue;
-    const adj = new Map<string, [number, number][]>();
-    const makeKey = (lat: number, lng: number) => `${lat.toFixed(5)},${lng.toFixed(5)}`;
-    for (const [lat, lng] of edges) {
-      const ak = makeKey(lat, lng);
-      if (!adj.has(ak)) adj.set(ak, []);
-    }
-    for (let i = 0; i < edges.length - 1; i++) {
-      const a = edges[i], b = edges[i + 1];
-      const ak = makeKey(a[0], a[1]), bk = makeKey(b[0], b[1]);
-      adj.get(ak)!.push(b);
-      adj.get(bk)!.push(a);
-    }
-
-    const used = new Set<string>();
-    for (const [start] of adj) {
-      if (used.has(start)) continue;
-      const startNeighbors = adj.get(start) || [];
-      if (startNeighbors.length !== 1 && adj.size > 1) continue;
-
-      const chain: [number, number][] = [];
-      let current = start, prev: string | null = null;
-      while (true) {
-        used.add(current);
-        const [lat, lng] = current.split(',').map(Number);
-        chain.push([lat, lng]);
-        const neighbors = (adj.get(current) || []).filter(n => {
-          const nk = makeKey(n[0], n[1]);
-          return nk !== prev && !used.has(nk);
-        });
-        if (!neighbors.length) break;
-        prev = current;
-        current = makeKey(neighbors[0][0], neighbors[0][1]);
-      }
-      if (chain.length >= 2) result.push({ pref, coords: chain });
-    }
-
-    for (const [start] of adj) {
-      if (used.has(start)) continue;
-      const chain: [number, number][] = [];
-      let current = start, prev: string | null = null;
-      while (true) {
-        used.add(current);
-        const [lat, lng] = current.split(',').map(Number);
-        chain.push([lat, lng]);
-        const neighbors = (adj.get(current) || []).filter(n => {
-          const nk = makeKey(n[0], n[1]);
-          return nk !== prev;
-        });
-        if (!neighbors.length) break;
-        const next = neighbors[0];
-        const nk = makeKey(next[0], next[1]);
-        if (nk === start) { chain.push([next[0], next[1]]); break; }
-        prev = current;
-        current = nk;
-      }
-      if (chain.length >= 2) result.push({ pref, coords: chain });
+      if (seg.length >= 2) result.push({ pref, coords: seg });
     }
   }
   return result;
