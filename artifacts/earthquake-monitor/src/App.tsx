@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 import { initAudioContext } from './lib/audio';
+import { log, subscribeLogs, getCategoryColor, type LogEntry } from './lib/logger';
 import { useEarthquakes } from './hooks/use-earthquakes';
 import { useEEW } from './hooks/use-eew';
 import { useTsunami } from './hooks/use-tsunami';
@@ -160,6 +161,8 @@ function Home() {
   const [leftTab, setLeftTab] = useState<'quake' | 'settings'>('quake');
   const [showEEWMap, setShowEEWMap] = useState(true);
   const [sandboxMode, setSandboxMode] = useState(false);
+  const [showLogPanel, setShowLogPanel] = useState(false);
+  const [logEntries, setLogEntries] = useState<LogEntry[]>([]);
   const locationPanelRef = useRef<HTMLDivElement>(null);
   const updatePanelRef = useRef<HTMLDivElement>(null);
 
@@ -259,10 +262,21 @@ function Home() {
         e.preventDefault();
         toggleTest(isSoundEnabled);
       }
+      if (e.shiftKey && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        setShowLogPanel(v => !v);
+      }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [toggleTest, isSoundEnabled]);
+
+  // Log subscription
+  useEffect(() => {
+    return subscribeLogs((entry) => {
+      setLogEntries(prev => [entry, ...prev].slice(0, 200));
+    });
+  }, []);
   // ───────────────────────────────────────────────────────────────────────
 
   // ── Notification triggers ──────────────────────────────────────────────
@@ -1125,8 +1139,62 @@ function Home() {
         </div>
       )}
 
+      {/* System log panel */}
+      {showLogPanel && (
+        <div className="absolute top-20 left-[390px] z-50 w-[420px] max-w-[calc(100vw-420px)] rounded-2xl border border-white/15 bg-[#141419]/95 p-4 text-white backdrop-blur-md shadow-2xl">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-bold">システムログ</span>
+              <span className="text-[10px] text-white/40 font-mono">Shift+Sでトグル</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] text-white/30">{logEntries.length}/200</span>
+              <button
+                onClick={() => setLogEntries([])}
+                className="px-2 py-0.5 rounded text-[10px] text-white/40 hover:text-white/70 hover:bg-white/5 transition-colors cursor-pointer"
+              >
+                クリア
+              </button>
+              <button
+                onClick={() => setShowLogPanel(false)}
+                className="px-2 py-0.5 rounded text-xs text-white/40 hover:text-white/70 hover:bg-white/5 transition-colors cursor-pointer"
+              >
+                ×
+              </button>
+            </div>
+          </div>
+          <div className="max-h-[320px] overflow-y-auto custom-scrollbar flex flex-col gap-1">
+            {logEntries.length === 0 && (
+              <div className="text-xs text-white/25 py-4 text-center">ログはまだありません</div>
+            )}
+            {logEntries.map(entry => (
+              <div key={entry.id} className="flex items-start gap-2 text-xs font-mono leading-tight">
+                <span className="text-white/30 shrink-0">{entry.time}</span>
+                <span
+                  className="px-1 py-0.5 rounded text-[10px] font-bold shrink-0 uppercase"
+                  style={{ color: getCategoryColor(entry.category), backgroundColor: `${getCategoryColor(entry.category)}15` }}
+                >
+                  {entry.category}
+                </span>
+                <span className="text-white/80">{entry.message}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Status bar */}
       <div className="status-bar absolute bottom-5 right-5 z-50 flex items-center gap-2">
+        <button
+          onClick={() => setShowLogPanel(v => !v)}
+          title="システムログ パネル (Shift+S)"
+          className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-all cursor-pointer backdrop-blur-md
+            ${showLogPanel
+              ? 'text-[#a78bfa] border-[#a78bfa]/50 bg-[#a78bfa]/10'
+              : 'text-white/35 border-white/10 bg-[#141419]/85 hover:text-white/60'}`}
+        >
+          LOG
+        </button>
         <button
           onClick={() => toggleTest(isSoundEnabled)}
           className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-all cursor-pointer backdrop-blur-md

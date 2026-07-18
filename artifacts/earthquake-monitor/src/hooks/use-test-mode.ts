@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback } from 'react';
 import { EEWData, EarthquakeHistoryItem, TsunamiInfo } from '../lib/utils-earthquake';
 import { initAudioContext, playSound } from '../lib/audio';
+import { log } from '../lib/logger';
 
 const LAT = 39.8;
 const LNG = 143.2;
@@ -95,6 +96,7 @@ export const useTestMode = () => {
     setTestQuake(null);
     setTestTsunami(null);
     setTestPhase(0);
+    log('TEST', '[テスト] レプレイ終了');
   }, []);
 
   const start = useCallback((soundEnabled: boolean) => {
@@ -118,6 +120,7 @@ export const useTestMode = () => {
         setTestEEW(makeEEW(1, '6.5', '4', false, false, originStr));
         setTestPhase(1);
         snd(playSound.caution);
+        log('TEST', `[テスト] 第1報 三陸沖 M6.5 予報受信`);
       }},
       { delay: 7000, fn: () => {
         setTestEEW(makeEEW(2, '7.1', '5弱', false, false, originStr));
@@ -128,36 +131,43 @@ export const useTestMode = () => {
         setTestEEW(makeEEW(3, '7.3', '5強', true, false, originStr));
         setTestPhase(3);
         snd(playSound.alert);
+        log('TEST', `[テスト] 第3報 警報発令 M7.3 警報`);
       }},
       { delay: 22000, fn: () => {
         setTestEEW(makeEEW(4, '7.4', '6弱', true, false, originStr));
         setTestPhase(4);
         snd(playSound.update);
+        log('TEST', `[テスト] 第4報 警報継続 M7.4`);
       }},
       { delay: 33000, fn: () => {
         setTestEEW(makeEEW(5, '7.4', '6強', true, true, originStr));
         setTestPhase(5);
         snd(playSound.end);
+        log('TEST', `[テスト] 最終報 結局 M7.4 震度6強`);
       }},
       { delay: 50000, fn: () => {
         setTestEEW(null);
         setTestQuake(makeQuake(originStr));
         setTestPhase(6);
+        log('TEST', `[テスト] 地震確定 三陸沖 M7.4 最大震度6強`);
       }},
       { delay: 65000, fn: () => {
         setTestTsunami(makeTsunami('Watch'));
         setTestPhase(7);
         snd(playSound.caution);
+        log('TEST', `[テスト] 津波注意報 発令`);
       }},
       { delay: 80000, fn: () => {
         setTestTsunami(makeTsunami('Warning'));
         setTestPhase(8);
         snd(playSound.alert);
+        log('TEST', `[テスト] 津波警報 発令`);
       }},
       { delay: 95000, fn: () => {
         setTestTsunami(makeTsunami('MajorWarning'));
         setTestPhase(9);
         snd(playSound.tsunamiDanger);
+        log('TEST', `[テスト] 大津波警報 発令 岩手青森`);
       }},
       { delay: TEST_TOTAL_SEC * 1000, fn: stop },
     ];

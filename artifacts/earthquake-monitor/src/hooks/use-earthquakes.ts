@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
-import { EarthquakeHistoryItem } from '../lib/utils-earthquake';
+import { EarthquakeHistoryItem, getScaleText } from '../lib/utils-earthquake';
 import { playSound } from '../lib/audio';
+import { log } from '../lib/logger';
 
 const formatLastUpdateTime = () =>
   new Date().toLocaleTimeString('ja-JP', {
@@ -38,6 +39,11 @@ export const useEarthquakes = (isSoundEnabled: boolean) => {
           } else {
             playSound.detect();
           }
+        }
+
+        if (isNew) {
+          const h = validQuakes[0].earthquake.hypocenter;
+          log('QUAKE', `新規地震 ${h.name} M${h.magnitude} 最大震度${getScaleText(validQuakes[0].earthquake.maxScale)}`);
         }
 
         if (isNew || !lastQuakeIdRef.current) {

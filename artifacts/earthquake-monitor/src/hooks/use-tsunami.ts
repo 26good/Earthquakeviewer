@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { TsunamiInfo } from '../lib/utils-earthquake';
 import { initAudioContext, playSound } from '../lib/audio';
+import { log } from '../lib/logger';
 
 const TSUNAMI_MAX_AGE_MS = 2 * 60 * 60 * 1000;
 
@@ -40,6 +41,7 @@ export const useTsunami = (isSoundEnabled: boolean) => {
 
       if (active && active.id !== lastAlertIdRef.current) {
         lastAlertIdRef.current = active.id;
+        log('TSUNAMI', `津波情報受信 — ${active.areas.length}エリア`);
         if (isSoundEnabled) {
           initAudioContext();
           const hasMajor = active.areas.some(a => a.grade === 'MajorWarning');

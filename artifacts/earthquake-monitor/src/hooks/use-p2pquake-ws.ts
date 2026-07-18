@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { EEWData, EarthquakeHistoryItem, TsunamiInfo } from '../lib/utils-earthquake';
 import { initAudioContext, playSound } from '../lib/audio';
+import { log } from '../lib/logger';
 
 const SBX_URL = 'wss://api-realtime-sandbox.p2pquake.net/v2/ws';
 
@@ -93,6 +94,7 @@ export const useP2PQuakeWS = (enabled: boolean, isSoundEnabled: boolean): Sandbo
 
       ws.onopen = () => {
         setSbxStatus('connected');
+        log('SBX', 'P2PサンドボックスWS 接続しました');
       };
 
       ws.onmessage = (event) => {
@@ -126,6 +128,7 @@ export const useP2PQuakeWS = (enabled: boolean, isSoundEnabled: boolean): Sandbo
 
             lastEEWSerialRef.current = converted.Serial;
             setEEW(converted);
+            log('SBX', `EEW 第${converted.Serial}報 ${converted.Hypocenter} 震度${converted.MaxInt}`);
 
             if (eewClearTimerRef.current) clearTimeout(eewClearTimerRef.current);
             eewClearTimerRef.current = setTimeout(() => {
@@ -150,6 +153,7 @@ export const useP2PQuakeWS = (enabled: boolean, isSoundEnabled: boolean): Sandbo
               }
               lastQuakeIdRef.current = quake.id;
               setSelectedQuake(quake);
+              log('SBX', `地震情報 ${quake.earthquake.hypocenter.name} M${quake.earthquake.hypocenter.magnitude}`);
             }
 
             setHistory(prev => {
@@ -169,6 +173,7 @@ export const useP2PQuakeWS = (enabled: boolean, isSoundEnabled: boolean): Sandbo
             if (info.id !== lastTsunamiIdRef.current) {
               lastTsunamiIdRef.current = info.id;
               setTsunami(info);
+              log('SBX', `津波情報 — ${info.areas.map(a => a.name).join('、')}`);
               const hasMajor = info.areas.some(a => a.grade === 'MajorWarning');
               const hasWarn = info.areas.some(a => a.grade === 'Warning');
               if (hasMajor) snd(playSound.tsunamiDanger);
@@ -182,6 +187,7 @@ export const useP2PQuakeWS = (enabled: boolean, isSoundEnabled: boolean): Sandbo
       ws.onclose = () => {
         setSbxStatus('error');
         reconnectTimer = setTimeout(connect, 5000);
+        log('SBX', 'P2PサンドボックスWS 切断 — 再接続');
       };
 
       ws.onerror = () => {
