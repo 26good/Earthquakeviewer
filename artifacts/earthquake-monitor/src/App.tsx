@@ -1008,7 +1008,7 @@ function Home() {
             </div>
 
             <div className="border-t border-white/8 pt-4 mt-auto">
-              <div className="text-[11px] text-white/25 text-center">地震監視モニター Ver 2.1.0</div>
+              <div className="text-[11px] text-white/25 text-center">地震監視モニター Ver 2.2.0</div>
             </div>
           </div>
         )}
@@ -1118,7 +1118,7 @@ function Home() {
           {isTestMode ? '⏹ TEST終了' : 'TEST'}
         </button>
         <div className="bg-[#141419]/85 backdrop-blur-md px-4 py-2 rounded-full text-xs text-[#a0a0a8]">
-          {isSandboxMode ? (sandboxStatus || 'Sandbox...') : status} | Ver 2.1.0
+          {isSandboxMode ? (sandboxStatus || 'Sandbox...') : status} | Ver 2.2.0
         </div>
       </div>
     </div>

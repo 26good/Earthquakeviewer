@@ -75,33 +75,36 @@ export const getScaleText = (scale: number) => {
   return map[scale] || '?';
 };
 
+// Intensity color scale — chosen to NOT overlap with tsunami indicator colors:
+//   Tsunami Watch=#facc15(yellow), Warning=#ef4444(red), MajorWarning=#8b5cf6(purple)
+// 1-3: blue→teal→lime  4: amber  5-/5+: orange  6-/6+: dark-red  7: magenta
 export const getIntensityColor = (scale: number | string | undefined) => {
   if (typeof scale === 'string') {
     const normalized = scale.replace('弱', '-').replace('強', '+');
     const map: Record<string, string> = {
-      '1': '#4682B4',
-      '2': '#2E8B57',
-      '3': '#DAA520',
-      '4': '#E67E22',
-      '5-': '#C0392B',
-      '5+': '#922B21',
-      '6-': '#8E44AD',
-      '6+': '#76448A',
-      '7': '#512E5F',
+      '1': '#60a5fa',   // blue-400
+      '2': '#34d399',   // emerald-400
+      '3': '#a3e635',   // lime-400
+      '4': '#fbbf24',   // amber-400
+      '5-': '#f97316',  // orange-500
+      '5+': '#ea580c',  // orange-600
+      '6-': '#dc2626',  // red-600  (darker than tsunami Warning #ef4444)
+      '6+': '#991b1b',  // red-800
+      '7': '#be185d',   // pink-700 (magenta — clearly distinct from tsunami purple)
     };
     return map[normalized] || '#4b89a8';
   }
 
   const map: Record<number, string> = {
-    10: '#4682B4',
-    20: '#2E8B57',
-    30: '#DAA520',
-    40: '#E67E22',
-    45: '#C0392B',
-    50: '#922B21',
-    55: '#8E44AD',
-    60: '#76448A',
-    70: '#512E5F',
+    10: '#60a5fa',
+    20: '#34d399',
+    30: '#a3e635',
+    40: '#fbbf24',
+    45: '#f97316',
+    50: '#ea580c',
+    55: '#dc2626',
+    60: '#991b1b',
+    70: '#be185d',
   };
   return scale ? map[scale] || '#4b89a8' : '#4b89a8';
 };
