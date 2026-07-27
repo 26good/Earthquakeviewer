@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "地震監視モニター"
+version = "1.0.0"
+id = "artifacts/earthquake-monitor"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 22604
+
+[services.development]
+run = "pnpm --filter @workspace/earthquake-monitor run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/earthquake-monitor", "run", "build" ]
+publicDir = "artifacts/earthquake-monitor/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "22604"
+BASE_PATH = "/"

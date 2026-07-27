@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "qkL0k2cuJ5ngxV_f7Rw3B"
+uri = "file://earthquake-monitor.tar.gz"
+type = "unspecified"
+title = "地震監視モニター（スタンドアロン HTML）"
