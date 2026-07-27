@@ -378,7 +378,7 @@ export const EarthquakeMap = ({ currentQuake, eew, tsunami, tsunamiSource, userL
             positions={coast.coords}
             pathOptions={{
               color,
-              weight: 3.5,
+              weight: 7,
               opacity: 0.92,
               lineCap: 'round',
               lineJoin: 'round',
