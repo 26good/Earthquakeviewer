@@ -145,7 +145,7 @@ const saveLocation = (loc: UserLocation) => {
 
 // Intensity scale labels for the observation points panel
 const SCALE_LABELS: Record<number, string> = {
-  10: '1', 20: '2', 30: '3', 40: '4', 45: '5弱', 50: '5強', 55: '6弱', 60: '6強', 70: '7',
+  10: '1', 20: '2', 30: '3', 40: '4', 45: '5-', 50: '5+', 55: '6-', 60: '6+', 70: '7',
 };
 
 function Home() {
@@ -531,12 +531,12 @@ function Home() {
               if (settingLocation) { setSettingLocation(false); return; }
               setShowLocationPanel(v => !v);
             }}
-            className={`rounded-full px-4 py-2 text-sm font-bold transition-all duration-300 backdrop-blur-md border cursor-pointer
+            className={`rounded-full px-4 py-2 text-sm font-bold transition-all duration-300 backdrop-blur-[20px] border cursor-pointer bg-[rgba(20,20,25,0.85)]
               ${settingLocation
-                ? 'text-yellow-300 border-yellow-300 bg-yellow-300/10 animate-pulse'
+                ? 'text-yellow-300 border-yellow-300 animate-pulse'
                 : userLocation
-                  ? 'text-[#38bdf8] border-[#38bdf8]/60 bg-[#38bdf8]/10'
-                  : 'text-[#a0a0a8] border-white/20 bg-black/50'}`}
+                  ? 'text-[#38bdf8] border-[#38bdf8]/60'
+                  : 'text-[#a0a0a8] border-white/20'}`}
           >
             📍 {settingLocation ? '地図をクリック...' : (userLocation?.label ?? (userLocation ? `${userLocation.lat.toFixed(2)},${userLocation.lng.toFixed(2)}` : '位置を設定'))}
           </button>
@@ -604,7 +604,7 @@ function Home() {
                       className="text-xl font-sans font-black px-2 py-0.5 rounded"
                       style={{ backgroundColor: getIntensityColor(userLocationIntensity), color: '#fff' }}
                     >
-                      {userLocationIntensity}
+                      {userLocationIntensity.replace('弱', '-').replace('強', '+')}
                     </span>
                     {groundInfo && (
                       <span className="text-white/35 text-[10px] leading-tight">
@@ -624,7 +624,7 @@ function Home() {
       )}
 
       {/* Left panel */}
-      <div className={`ui-layer absolute ${isTestMode ? 'top-14' : 'top-5'} left-5 w-[350px] h-[calc(100vh-40px)] z-50 flex flex-col gap-3 pointer-events-none`}>
+      <div className="ui-layer absolute top-5 left-5 w-[350px] h-[calc(100vh-40px)] z-50 flex flex-col gap-3 pointer-events-none">
 
         {/* Main tab bar: 地震情報 / 設定 */}
         <div className="flex flex-shrink-0 rounded-xl overflow-hidden border border-white/10 bg-[#141419]/85 backdrop-blur-md pointer-events-auto shadow-xl">
