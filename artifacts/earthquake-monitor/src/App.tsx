@@ -150,6 +150,13 @@ const SCALE_LABELS: Record<number, string> = {
 
 function Home() {
   const [isSoundEnabled, setIsSoundEnabled] = useState(true);
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+    const saved = localStorage.getItem('theme_v1');
+    return saved === 'light' ? 'light' : 'dark';
+  });
+  useEffect(() => {
+    localStorage.setItem('theme_v1', theme);
+  }, [theme]);
   const [currentTime, setCurrentTime] = useState(formatClockTime);
   const [userLocation, setUserLocation] = useState<UserLocation>(loadSavedLocation);
   const [settingLocation, setSettingLocation] = useState(false);
@@ -488,7 +495,7 @@ function Home() {
       : null;
 
   return (
-    <div className="relative w-full h-screen bg-black overflow-hidden font-sans text-white dark">
+    <div className={`relative w-full h-screen overflow-hidden font-sans transition-colors duration-200 ${theme === 'dark' ? 'dark bg-black text-white' : 'bg-white text-black'}`}>
 
       {/* ── Test mode indicator (bottom-right, unobtrusive) ─────────────── */}
       {isTestMode && (
@@ -519,6 +526,7 @@ function Home() {
         userLocationIntensity={userLocationIntensity}
         showObsPoints={showObsPoints}
         showEEWMap={showEEWMap}
+        theme={theme}
       />
 
       {/* Top-right button row */}
@@ -918,6 +926,18 @@ function Home() {
             <div>
               <div className="text-[11px] font-bold text-white/40 uppercase tracking-widest mb-3">表示</div>
               <div className="flex flex-col gap-2">
+                <label className="flex items-center justify-between cursor-pointer">
+                  <div>
+                    <div className="text-sm font-semibold text-white/90">ライトモード</div>
+                    <div className="text-[11px] text-white/40">画面配色を明るいテーマに切り替え</div>
+                  </div>
+                  <button
+                    onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}
+                    className={`relative w-11 h-6 rounded-full transition-colors duration-200 border ${theme === 'light' ? 'bg-[#38bdf8] border-[#38bdf8]' : 'bg-white/10 border-white/20'}`}
+                  >
+                    <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform duration-200 ${theme === 'light' ? 'translate-x-5' : 'translate-x-0'}`} />
+                  </button>
+                </label>
                 <label className="flex items-center justify-between cursor-pointer">
                   <div>
                     <div className="text-sm font-semibold text-white/90">観測点マーカー</div>
