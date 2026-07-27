@@ -37,32 +37,6 @@
 }
 
 :root {
-<<<<<<< HEAD
-  --background: 240 100% 1%; /* #000002 */
-  --foreground: 0 0% 100%;
-  --border: 240 5% 26%;
-  --input: 240 5% 26%;
-  --ring: 240 5% 26%;
-
-  --card: 226 24% 16%; /* #202434 */
-  --card-foreground: 0 0% 100%;
-  --card-border: 240 5% 26%;
-
-  --popover: 226 24% 16%;
-  --popover-foreground: 0 0% 100%;
-  --popover-border: 240 5% 26%;
-
-  --primary: 156 59% 51%; /* #4cd0a7 */
-  --primary-foreground: 0 0% 100%;
-
-  --muted: 240 4% 16%;
-  --muted-foreground: 240 5% 65%; /* #a0a0a8 */
-
-  --accent: 240 4% 16%;
-  --accent-foreground: 0 0% 100%;
-
-  --destructive: 0 84% 60%;
-=======
   --background: 210 20% 98%; /* #f7f9fa */
   --foreground: 224 20% 12%;
   --border: 220 13% 85%;
@@ -87,7 +61,6 @@
   --accent-foreground: 224 20% 12%;
 
   --destructive: 0 72% 48%;
->>>>>>> ff108d59f2448fbb506e92431b1dcf24c91675fe
   --destructive-foreground: 0 0% 100%;
 
   --radius: 12px;
@@ -139,8 +112,6 @@
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
 }
 
-<<<<<<< HEAD
-=======
 :root:not(.dark) .glass-panel {
   background: rgba(255, 255, 255, 0.85);
   border: 1px solid rgba(0, 0, 0, 0.08);
@@ -153,7 +124,6 @@
   color: #1a1d24 !important;
 }
 
->>>>>>> ff108d59f2448fbb506e92431b1dcf24c91675fe
 .eew-warning-header {
   background: repeating-linear-gradient(-45deg, #220000, #220000 10px, #440000 10px, #440000 20px);
 }
@@ -220,18 +190,6 @@
   }
 }
 
-<<<<<<< HEAD
-.scale-10 { background: #4682B4; }
-.scale-20 { background: #2E8B57; }
-.scale-30 { background: #DAA520; }
-.scale-40 { background: #E67E22; }
-.scale-45 { background: #C0392B; }
-.scale-50 { background: #922B21; }
-.scale-55 { background: #8E44AD; }
-.scale-60 { background: #76448A; }
-.scale-70 { background: #512E5F; }
-=======
->>>>>>> ff108d59f2448fbb506e92431b1dcf24c91675fe
 
 .history-list {
   scrollbar-width: thin;
@@ -257,12 +215,9 @@
 .leaflet-container {
   background-color: #050508 !important;
 }
-<<<<<<< HEAD
-=======
 :root:not(.dark) .leaflet-container {
   background-color: #dbe4ea !important;
 }
->>>>>>> ff108d59f2448fbb506e92431b1dcf24c91675fe
 .leaflet-bottom.leaflet-right {
   bottom: 60px;
   right: 10px;
@@ -289,8 +244,6 @@
   background: rgba(76, 208, 167, 0.18) !important;
 }
 
-<<<<<<< HEAD
-=======
 :root:not(.dark) .leaflet-control-zoom,
 :root:not(.dark) .leaflet-control-zoom a {
   background: rgba(255, 255, 255, 0.9) !important;
@@ -302,7 +255,6 @@
   background: rgba(76, 208, 167, 0.18) !important;
 }
 
->>>>>>> ff108d59f2448fbb506e92431b1dcf24c91675fe
 @media (max-width: 900px) {
   .ui-layer {
     top: 12px !important;

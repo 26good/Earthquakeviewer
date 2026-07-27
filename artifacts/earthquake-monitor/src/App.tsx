@@ -150,8 +150,6 @@ const SCALE_LABELS: Record<number, string> = {
 
 function Home() {
   const [isSoundEnabled, setIsSoundEnabled] = useState(true);
-<<<<<<< HEAD
-=======
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     const saved = localStorage.getItem('theme_v1');
     return saved === 'light' ? 'light' : 'dark';
@@ -159,7 +157,6 @@ function Home() {
   useEffect(() => {
     localStorage.setItem('theme_v1', theme);
   }, [theme]);
->>>>>>> ff108d59f2448fbb506e92431b1dcf24c91675fe
   const [currentTime, setCurrentTime] = useState(formatClockTime);
   const [userLocation, setUserLocation] = useState<UserLocation>(loadSavedLocation);
   const [settingLocation, setSettingLocation] = useState(false);
@@ -498,27 +495,6 @@ function Home() {
       : null;
 
   return (
-<<<<<<< HEAD
-    <div className="relative w-full h-screen bg-black overflow-hidden font-sans text-white dark">
-
-      {/* ── Test mode banner ─────────────────────────────────────────────── */}
-      {isTestMode && (
-        <div className="absolute top-0 left-0 right-0 z-[200] flex items-center justify-between px-4 py-2 bg-red-700/95 backdrop-blur-sm border-b border-red-400/30">
-          <div className="flex items-center gap-3">
-            <span className="text-white font-black text-sm animate-pulse">🔴 REPLAY</span>
-            <span className="text-white/90 text-xs font-semibold">
-              {PHASE_LABELS[testPhase] || '準備中'}
-            </span>
-            <span className="text-white/50 text-xs">
-              ({testPhase}/{TEST_TOTAL_PHASES})
-            </span>
-          </div>
-          <button
-            className="text-white/80 text-xs font-bold hover:text-white cursor-pointer border border-white/30 rounded px-2 py-0.5 hover:bg-white/10"
-            onClick={() => toggleTest(isSoundEnabled)}
-          >
-            ✕ 終了
-=======
     <div className={`relative w-full h-screen overflow-hidden font-sans transition-colors duration-200 ${theme === 'dark' ? 'dark bg-black text-white' : 'bg-white text-black'}`}>
 
       {/* ── Test mode indicator (bottom-right, unobtrusive) ─────────────── */}
@@ -533,7 +509,6 @@ function Home() {
             onClick={() => toggleTest(isSoundEnabled)}
           >
             ✕
->>>>>>> ff108d59f2448fbb506e92431b1dcf24c91675fe
           </button>
         </div>
       )}
@@ -551,10 +526,7 @@ function Home() {
         userLocationIntensity={userLocationIntensity}
         showObsPoints={showObsPoints}
         showEEWMap={showEEWMap}
-<<<<<<< HEAD
-=======
         theme={theme}
->>>>>>> ff108d59f2448fbb506e92431b1dcf24c91675fe
       />
 
       {/* Top-right button row */}
@@ -956,8 +928,6 @@ function Home() {
               <div className="flex flex-col gap-2">
                 <label className="flex items-center justify-between cursor-pointer">
                   <div>
-<<<<<<< HEAD
-=======
                     <div className="text-sm font-semibold text-white/90">ライトモード</div>
                     <div className="text-[11px] text-white/40">画面配色を明るいテーマに切り替え</div>
                   </div>
@@ -970,7 +940,6 @@ function Home() {
                 </label>
                 <label className="flex items-center justify-between cursor-pointer">
                   <div>
->>>>>>> ff108d59f2448fbb506e92431b1dcf24c91675fe
                     <div className="text-sm font-semibold text-white/90">観測点マーカー</div>
                     <div className="text-[11px] text-white/40">震度数字を地図に表示</div>
                   </div>

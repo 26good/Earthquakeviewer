@@ -24,10 +24,7 @@ type Props = {
   userLocationIntensity?: string | null;
   showObsPoints?: boolean;
   showEEWMap?: boolean;
-<<<<<<< HEAD
-=======
   theme?: 'light' | 'dark';
->>>>>>> ff108d59f2448fbb506e92431b1dcf24c91675fe
 };
 
 const P_WAVE_SPEED_KM_PER_SEC = 6.0;
@@ -211,11 +208,7 @@ const extractCoastlines = (geoData: any): Array<{ pref: string; coords: [number,
   return result;
 };
 
-<<<<<<< HEAD
-export const EarthquakeMap = ({ currentQuake, eew, tsunami, tsunamiSource, userLocation, onSetUserLocation, settingLocation, userNearestPref, userLocationIntensity, showObsPoints = true, showEEWMap = true }: Props) => {
-=======
 export const EarthquakeMap = ({ currentQuake, eew, tsunami, tsunamiSource, userLocation, onSetUserLocation, settingLocation, userNearestPref, userLocationIntensity, showObsPoints = true, showEEWMap = true, theme = 'dark' }: Props) => {
->>>>>>> ff108d59f2448fbb506e92431b1dcf24c91675fe
   const [geoData, setGeoData] = useState<any>(null);
 
   const hasTsunamiInfo = !!tsunami && tsunami.areas.length > 0;
@@ -261,15 +254,9 @@ export const EarthquakeMap = ({ currentQuake, eew, tsunami, tsunamiSource, userL
   }
 
   const getStyle = (feature: any) => {
-<<<<<<< HEAD
-    let fillColor = '#15151b';
-    let fillOpacity = 1;
-    let borderColor = '#3a3a50';
-=======
     let fillColor = theme === 'light' ? '#e2e5ea' : '#15151b';
     let fillOpacity = 1;
     let borderColor = theme === 'light' ? '#9aa0ab' : '#3a3a50';
->>>>>>> ff108d59f2448fbb506e92431b1dcf24c91675fe
     let borderWeight = 0.8;
     const featureText = JSON.stringify(feature.properties);
 
@@ -329,11 +316,7 @@ export const EarthquakeMap = ({ currentQuake, eew, tsunami, tsunamiSource, userL
   const createIcon = (scale: number) =>
     L.divIcon({
       className: '',
-<<<<<<< HEAD
-      html: `<div class="intensity-icon scale-${scale}">${getScaleText(scale)}</div>`,
-=======
       html: `<div class="intensity-icon" style="background-color:${getIntensityColor(scale)}">${getScaleText(scale)}</div>`,
->>>>>>> ff108d59f2448fbb506e92431b1dcf24c91675fe
       iconSize: [32, 32],
       iconAnchor: [16, 16],
     });
@@ -396,11 +379,7 @@ export const EarthquakeMap = ({ currentQuake, eew, tsunami, tsunamiSource, userL
             positions={coast.coords}
             pathOptions={{
               color,
-<<<<<<< HEAD
-              weight: 3.5,
-=======
               weight: 7,
->>>>>>> ff108d59f2448fbb506e92431b1dcf24c91675fe
               opacity: 0.92,
               lineCap: 'round',
               lineJoin: 'round',
