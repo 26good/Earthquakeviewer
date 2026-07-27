@@ -178,15 +178,6 @@
   }
 }
 
-.scale-10 { background: #4682B4; }
-.scale-20 { background: #2E8B57; }
-.scale-30 { background: #DAA520; }
-.scale-40 { background: #E67E22; }
-.scale-45 { background: #C0392B; }
-.scale-50 { background: #922B21; }
-.scale-55 { background: #8E44AD; }
-.scale-60 { background: #76448A; }
-.scale-70 { background: #512E5F; }
 
 .history-list {
   scrollbar-width: thin;

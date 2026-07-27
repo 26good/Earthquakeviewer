@@ -315,7 +315,7 @@ export const EarthquakeMap = ({ currentQuake, eew, tsunami, tsunamiSource, userL
   const createIcon = (scale: number) =>
     L.divIcon({
       className: '',
-      html: `<div class="intensity-icon scale-${scale}">${getScaleText(scale)}</div>`,
+      html: `<div class="intensity-icon" style="background-color:${getIntensityColor(scale)}">${getScaleText(scale)}</div>`,
       iconSize: [32, 32],
       iconAnchor: [16, 16],
     });

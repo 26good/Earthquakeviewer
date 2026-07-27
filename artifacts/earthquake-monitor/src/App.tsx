@@ -490,23 +490,18 @@ function Home() {
   return (
     <div className="relative w-full h-screen bg-black overflow-hidden font-sans text-white dark">
 
-      {/* ── Test mode banner ─────────────────────────────────────────────── */}
+      {/* ── Test mode indicator (bottom-right, unobtrusive) ─────────────── */}
       {isTestMode && (
-        <div className="absolute top-0 left-0 right-0 z-[200] flex items-center justify-between px-4 py-2 bg-red-700/95 backdrop-blur-sm border-b border-red-400/30">
-          <div className="flex items-center gap-3">
-            <span className="text-white font-black text-sm animate-pulse">🔴 REPLAY</span>
-            <span className="text-white/90 text-xs font-semibold">
-              {PHASE_LABELS[testPhase] || '準備中'}
-            </span>
-            <span className="text-white/50 text-xs">
-              ({testPhase}/{TEST_TOTAL_PHASES})
-            </span>
-          </div>
+        <div className="absolute bottom-4 right-4 z-[200] flex items-center gap-2 rounded-lg border border-white/15 bg-black/70 backdrop-blur-sm px-3 py-1.5 shadow-lg">
+          <span className="text-white/70 text-[11px] font-bold tracking-wide">テスト</span>
+          <span className="text-white/40 text-[10px]">
+            {PHASE_LABELS[testPhase] || '準備中'} ({testPhase}/{TEST_TOTAL_PHASES})
+          </span>
           <button
-            className="text-white/80 text-xs font-bold hover:text-white cursor-pointer border border-white/30 rounded px-2 py-0.5 hover:bg-white/10"
+            className="text-white/60 text-[11px] font-bold hover:text-white cursor-pointer border border-white/20 rounded px-1.5 py-0.5 hover:bg-white/10"
             onClick={() => toggleTest(isSoundEnabled)}
           >
-            ✕ 終了
+            ✕
           </button>
         </div>
       )}
