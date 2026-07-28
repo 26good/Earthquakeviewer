@@ -160,6 +160,14 @@ function Home() {
   const [leftTab, setLeftTab] = useState<'quake' | 'settings'>('quake');
   const [showEEWMap, setShowEEWMap] = useState(true);
   const [isSandboxMode, setIsSandboxMode] = useState(false);
+  const [historyLimit, setHistoryLimit] = useState<number>(() => {
+    const saved = localStorage.getItem('history_limit_v1');
+    const n = saved ? parseInt(saved, 10) : 30;
+    return Number.isFinite(n) && n > 0 ? n : 30;
+  });
+  useEffect(() => {
+    localStorage.setItem('history_limit_v1', String(historyLimit));
+  }, [historyLimit]);
   const locationPanelRef = useRef<HTMLDivElement>(null);
   const updatePanelRef = useRef<HTMLDivElement>(null);
 
@@ -224,7 +232,7 @@ function Home() {
     setShowLocationPanel(false);
   }, []);
 
-  const { history, selectedQuake: liveSelectedQuake, setSelectedQuake, lastUpdate } = useEarthquakes(isSoundEnabled);
+  const { history, selectedQuake: liveSelectedQuake, setSelectedQuake, lastUpdate } = useEarthquakes(isSoundEnabled, historyLimit);
   const { eew: liveEEW, status } = useEEW(isSoundEnabled);
   const { tsunami: liveTsunami, lastTsunamiUpdate } = useTsunami(isSoundEnabled);
   const p2pRealtime = useP2PQuakeRealtime(isSandboxMode, isSoundEnabled);
@@ -892,6 +900,23 @@ function Home() {
             <div>
               <div className="text-[11px] font-bold text-white/40 uppercase tracking-widest mb-3">表示</div>
               <div className="flex flex-col gap-2">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-sm font-semibold text-white/90">地震取得件数</div>
+                    <div className="text-[11px] text-white/40">地震一覧に表示する件数</div>
+                  </div>
+                  <div className="flex gap-1">
+                    {[10, 20, 30, 50, 100].map(n => (
+                      <button
+                        key={n}
+                        onClick={() => setHistoryLimit(n)}
+                        className={`px-2.5 py-1 rounded-md text-xs font-bold border transition-colors duration-150 ${historyLimit === n ? 'bg-[#38bdf8] border-[#38bdf8] text-black' : 'bg-white/5 border-white/15 text-white/60 hover:bg-white/10'}`}
+                      >
+                        {n}
+                      </button>
+                    ))}
+                  </div>
+                </div>
                 <label className="flex items-center justify-between cursor-pointer">
                   <div>
                     <div className="text-sm font-semibold text-white/90">観測点マーカー</div>
